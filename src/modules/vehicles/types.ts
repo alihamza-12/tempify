@@ -1,0 +1,21 @@
+export type VehicleResult = {
+  registration: string;
+  make: string;
+  model: string;
+  description?: string;
+  colour?: string;
+  year?: number;
+  fuelType?: string;
+  engineCapacityCC?: number;
+  bodyStyle?: string;
+  variant?: string;
+  transmission?: string;
+  numberOfDoors?: number;
+  numberOfSeats?: number;
+  vehicleInsuranceGroup?: number;
+  vehicleInsuranceGroupOutOf?: number;
+  abiCode?: string;
+  imageUrl?: string;
+  source: "regcheck";
+  verifiedAt: string;
+};
