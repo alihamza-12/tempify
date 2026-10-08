@@ -9,12 +9,8 @@ export async function createQuote(input: CreateQuoteInput) {
   await connectToDatabase();
   const { vehicle } = await findOrVerifyVehicle(input.registration);
   const startAt = new Date(input.cover.startAt);
-  const nowWithGrace = Date.now() - 5 * 60 * 1000;
-
-  // A legitimate cover period cannot be backdated. Historical document
-  // generation is intentionally not supported.
-  if (startAt.getTime() < nowWithGrace) {
-    throw new QuoteError("Cover cannot start in the past. Choose now or a future time.", 400);
+  if (Number.isNaN(startAt.getTime())) {
+    throw new QuoteError("Choose a valid start date and time.", 400);
   }
 
   const birthDate = new Date(`${input.driver.dateOfBirth}T00:00:00.000Z`);
@@ -22,7 +18,9 @@ export async function createQuote(input: CreateQuoteInput) {
   const age = new Date().getUTCFullYear() - birthDate.getUTCFullYear();
   if (age < 17) throw new QuoteError("The driver must be at least 17 years old.", 400);
 
-  const pricing = calculateQuotePrice(input.cover.durationUnit, input.cover.durationValue);
+  // Pricing is always calculated on the server. Starts more than five minutes
+  // in the past receive the configured historical-start surcharge.
+  const pricing = calculateQuotePrice(input.cover.durationUnit, input.cover.durationValue, startAt);
   const endAt = getEndDate(startAt, input.cover.durationUnit, input.cover.durationValue);
   const publicId = randomUUID();
 

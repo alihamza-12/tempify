@@ -36,7 +36,7 @@ type FormValues = {
   reasonForCover: "Borrowing" | "Buying/Selling/Testing" | "Learning" | "Maintenance" | "Other";
 };
 
-const occupations = ["Accountant", "Architect", "Builder", "Business owner", "Carer", "Chef", "Civil servant", "Consultant", "Delivery driver", "Designer", "Doctor", "Electrician", "Engineer", "Mechanic", "Nurse", "Office manager", "Retail worker", "Software developer", "Student", "Teacher"];
+const occupations = ["Accountant", "Architect", "Builder", "Business Owner", "Carer", "Chef", "Civil Servant", "Consultant", "Delivery Driver", "Designer", "Doctor", "Electrician", "Engineer", "Mechanic", "Nurse", "Office Manager", "Retail Worker", "Software Developer", "Student", "Teacher"];
 const modifications = [
   ["alloy-wheels", "Alloy wheels (aftermarket)"],
   ["wheel-size", "Changing wheel size"],
@@ -47,11 +47,23 @@ const modifications = [
   ["custom-plates", "Custom 3D/4D plates"],
 ];
 
-function localDateTimeMinimum() {
+function localDateTimeValue() {
   const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset() + 2);
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   return now.toISOString().slice(0, 16);
 }
+
+function capitalizeWords(value: string) {
+  return value.replace(/(^|[\s'-])([a-z])/g, (_match, prefix: string, letter: string) => {
+    return `${prefix}${letter.toUpperCase()}`;
+  });
+}
+
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, "").slice(0, 15);
+}
+
+type CapitalizedField = "firstName" | "lastName" | "occupation" | "line1" | "line2" | "city";
 
 export function QuoteForm({ registration }: { registration: string }) {
   const router = useRouter();
@@ -63,12 +75,12 @@ export function QuoteForm({ registration }: { registration: string }) {
   const [durationUnit, setDurationUnit] = useState<"hours" | "days" | "weeks">("hours");
   const [durationValue, setDurationValue] = useState(1);
   const [startMode, setStartMode] = useState<"immediate" | "scheduled">("immediate");
-  const [scheduledStart, setScheduledStart] = useState(localDateTimeMinimum());
+  const [scheduledStart, setScheduledStart] = useState(localDateTimeValue());
   const [selectedModifications, setSelectedModifications] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       title: "Mr",
       licenceType: "Full UK",
@@ -77,6 +89,20 @@ export function QuoteForm({ registration }: { registration: string }) {
       reasonForCover: "Borrowing",
     },
   });
+
+  function updateCapitalizedField(field: CapitalizedField, value: string) {
+    setValue(field, capitalizeWords(value), {
+      shouldDirty: true,
+      shouldValidate: Boolean(errors[field]),
+    });
+  }
+
+  function updatePhone(value: string) {
+    setValue("phone", digitsOnly(value), {
+      shouldDirty: true,
+      shouldValidate: Boolean(errors.phone),
+    });
+  }
 
   useEffect(() => {
     if (!registration) return;
@@ -102,6 +128,10 @@ export function QuoteForm({ registration }: { registration: string }) {
     setSubmitting(true);
     try {
       const startAt = startMode === "immediate" ? new Date() : new Date(scheduledStart);
+      if (Number.isNaN(startAt.getTime())) {
+        throw new Error("Choose a valid start date and time.");
+      }
+
       const response = await fetch("/api/quotes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,18 +140,18 @@ export function QuoteForm({ registration }: { registration: string }) {
           cover: { durationUnit, durationValue, startAt: startAt.toISOString() },
           driver: {
             title: values.title,
-            firstName: values.firstName,
-            lastName: values.lastName,
+            firstName: capitalizeWords(values.firstName.trim()),
+            lastName: capitalizeWords(values.lastName.trim()),
             dateOfBirth: values.dateOfBirth,
-            occupation: values.occupation,
-            phone: values.phone,
-            email: values.email,
+            occupation: capitalizeWords(values.occupation.trim()),
+            phone: digitsOnly(values.phone),
+            email: values.email.trim().toLowerCase(),
           },
           address: {
-            line1: values.line1,
-            line2: values.line2,
-            city: values.city,
-            postcode: values.postcode,
+            line1: capitalizeWords(values.line1.trim()),
+            line2: capitalizeWords((values.line2 || "").trim()),
+            city: capitalizeWords(values.city.trim()),
+            postcode: values.postcode.trim().toUpperCase(),
           },
           licence: {
             number: values.licenceNumber,
@@ -144,8 +174,13 @@ export function QuoteForm({ registration }: { registration: string }) {
     }
   }
 
+  function handleInvalidSubmission() {
+    setSubmitError("Please check the highlighted fields and enter valid details before continuing.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
-    <form onSubmit={handleSubmit(submit)} className="space-y-4">
+    <form noValidate onSubmit={handleSubmit(submit, handleInvalidSubmission)} className="space-y-4">
       {submitError && <div className="error-box">{submitError}</div>}
 
       <SectionCard icon={CarFront} title="Vehicle details" accent="emerald">
@@ -178,36 +213,61 @@ export function QuoteForm({ registration }: { registration: string }) {
           </div>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <label><FieldLabel text="Start option" /><select className="field" value={startMode} onChange={(event) => setStartMode(event.target.value as "immediate" | "scheduled")}><option value="immediate">Immediate start</option><option value="scheduled">Schedule a future time</option></select></label>
-          <label className={startMode === "immediate" ? "opacity-45" : ""}><FieldLabel text="Start date & time" /><input type="datetime-local" className="field" min={localDateTimeMinimum()} disabled={startMode === "immediate"} value={scheduledStart} onChange={(event) => setScheduledStart(event.target.value)} /></label>
+          <label><FieldLabel text="Start option" /><select className="field" value={startMode} onChange={(event) => setStartMode(event.target.value as "immediate" | "scheduled")}><option value="immediate">Immediate start</option><option value="scheduled">Choose date & time</option></select></label>
+          <label className={startMode === "immediate" ? "opacity-45" : ""}><FieldLabel text="Start date & time" /><input type="datetime-local" className="field" disabled={startMode === "immediate"} value={scheduledStart} onChange={(event) => setScheduledStart(event.target.value)} /></label>
         </div>
-        <p className="mt-4 text-xs text-slate-500">Cover can start now or in the future. Backdated cover is not available.</p>
+        <p className="mt-4 text-xs text-slate-500">Previous dates and times can be selected. Past starts receive a higher price calculated securely on the server.</p>
       </SectionCard>
 
       <SectionCard icon={UserRound} title="Driver details">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Title" error={errors.title?.message}><select className="field" {...register("title", { required: true })}>{["Mr", "Mrs", "Miss", "Ms", "Mx"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
-          <FormField label="First name" error={errors.firstName?.message}><input className="field" {...register("firstName", { required: "First name is required" })} /></FormField>
-          <FormField label="Last name" error={errors.lastName?.message}><input className="field" {...register("lastName", { required: "Last name is required" })} /></FormField>
-          <FormField label="Date of birth" error={errors.dateOfBirth?.message}><input type="date" className="field" {...register("dateOfBirth", { required: "Date of birth is required" })} /></FormField>
-          <FormField label="Occupation" error={errors.occupation?.message}><input className="field" list="occupations" placeholder="Search occupation…" {...register("occupation", { required: "Occupation is required" })} /><datalist id="occupations">{occupations.map((item) => <option key={item} value={item} />)}</datalist></FormField>
-          <FormField label="Phone number" error={errors.phone?.message}><input className="field" inputMode="tel" placeholder="07123 456789" {...register("phone", { required: "Phone number is required" })} /></FormField>
-          <div className="sm:col-span-2"><FormField label="Email address" error={errors.email?.message}><input type="email" className="field" placeholder="you@example.com" {...register("email", { required: "Email is required" })} /></FormField></div>
+          <FormField label="First name" error={errors.firstName?.message}>
+            <input className="field" autoComplete="given-name" {...register("firstName", { required: "First name is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 60, message: "Enter no more than 60 characters" } })} onChange={(event) => updateCapitalizedField("firstName", event.target.value)} />
+          </FormField>
+          <FormField label="Last name" error={errors.lastName?.message}>
+            <input className="field" autoComplete="family-name" {...register("lastName", { required: "Last name is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 60, message: "Enter no more than 60 characters" } })} onChange={(event) => updateCapitalizedField("lastName", event.target.value)} />
+          </FormField>
+          <FormField label="Date of birth" error={errors.dateOfBirth?.message}><input type="date" className="field" autoComplete="bday" {...register("dateOfBirth", { required: "Date of birth is required" })} /></FormField>
+          <FormField label="Occupation" error={errors.occupation?.message}>
+            <input className="field" list="occupations" placeholder="Search occupation…" autoComplete="organization-title" {...register("occupation", { required: "Occupation is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 100, message: "Enter no more than 100 characters" } })} onChange={(event) => updateCapitalizedField("occupation", event.target.value)} />
+            <datalist id="occupations">{occupations.map((item) => <option key={item} value={item} />)}</datalist>
+          </FormField>
+          <FormField label="Phone number" error={errors.phone?.message}>
+            <input type="tel" className="field" inputMode="numeric" autoComplete="tel" maxLength={15} placeholder="07123456789" {...register("phone", { required: "Phone number is required", pattern: { value: /^[0-9]{7,15}$/, message: "Enter 7 to 15 digits only" } })} onChange={(event) => updatePhone(event.target.value)} />
+          </FormField>
+          <div className="sm:col-span-2">
+            <FormField label="Email address" error={errors.email?.message}>
+              <input type="email" className="field" inputMode="email" autoComplete="email" maxLength={254} placeholder="you@example.com" {...register("email", { required: "Email is required", pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/, message: "Enter a valid email address" }, setValueAs: (value) => String(value || "").trim().toLowerCase() })} />
+            </FormField>
+          </div>
         </div>
       </SectionCard>
 
       <SectionCard icon={MapPin} title="Address information">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="sm:col-span-2"><FormField label="Address line 1" error={errors.line1?.message}><input className="field" {...register("line1", { required: "Address is required" })} /></FormField></div>
-          <div className="sm:col-span-2"><FormField label="Address line 2 (optional)"><input className="field" {...register("line2")} /></FormField></div>
-          <FormField label="City / town" error={errors.city?.message}><input className="field" {...register("city", { required: "City is required" })} /></FormField>
-          <FormField label="Postcode" error={errors.postcode?.message}><input className="field uppercase" placeholder="SW1A 1AA" {...register("postcode", { required: "Postcode is required" })} /></FormField>
+          <div className="sm:col-span-2">
+            <FormField label="Address line 1" error={errors.line1?.message}>
+              <input className="field" autoComplete="address-line1" {...register("line1", { required: "Address is required", minLength: { value: 3, message: "Enter at least 3 characters" }, maxLength: { value: 120, message: "Enter no more than 120 characters" } })} onChange={(event) => updateCapitalizedField("line1", event.target.value)} />
+            </FormField>
+          </div>
+          <div className="sm:col-span-2">
+            <FormField label="Address line 2 (optional)" error={errors.line2?.message}>
+              <input className="field" autoComplete="address-line2" {...register("line2", { maxLength: { value: 120, message: "Enter no more than 120 characters" } })} onChange={(event) => updateCapitalizedField("line2", event.target.value)} />
+            </FormField>
+          </div>
+          <FormField label="City / town" error={errors.city?.message}>
+            <input className="field" autoComplete="address-level2" {...register("city", { required: "City is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 80, message: "Enter no more than 80 characters" } })} onChange={(event) => updateCapitalizedField("city", event.target.value)} />
+          </FormField>
+          <FormField label="Postcode" error={errors.postcode?.message}>
+            <input className="field uppercase" autoComplete="postal-code" maxLength={10} placeholder="SW1A 1AA" {...register("postcode", { required: "Postcode is required", minLength: { value: 5, message: "Enter a valid postcode" }, maxLength: { value: 10, message: "Enter a valid postcode" }, setValueAs: (value) => String(value || "").trim().toUpperCase() })} />
+          </FormField>
         </div>
       </SectionCard>
 
       <SectionCard icon={CreditCard} title="Licence & vehicle">
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Driving licence number" error={errors.licenceNumber?.message}><input className="field uppercase" {...register("licenceNumber", { required: "Licence number is required" })} /></FormField>
+          <FormField label="Driving licence number" error={errors.licenceNumber?.message}><input className="field uppercase" autoComplete="off" maxLength={24} {...register("licenceNumber", { required: "Licence number is required", minLength: { value: 8, message: "Enter at least 8 characters" }, maxLength: { value: 24, message: "Enter no more than 24 characters" }, setValueAs: (value) => String(value || "").trim().toUpperCase() })} /></FormField>
           <FormField label="Licence type"><select className="field" {...register("licenceType")}>{["Full UK", "Provisional UK", "International", "Full EU"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
           <FormField label="Licence held for"><select className="field" {...register("heldFor")}>{["Under 1 Year", "1-2 Years", "2-4 Years", "5-10 Years", "10+ Years"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
           <FormField label="Vehicle value"><select className="field" {...register("vehicleValue")}>{["£1,000 - £5,000", "£5,000 - £10,000", "£10,000 - £20,000", "£20,000 - £30,000", "£30,000 - £50,000", "£50,000 - £80,000", "£80,000+"].map((item) => <option key={item}>{item}</option>)}</select></FormField>

@@ -76,6 +76,44 @@ export async function sendPaymentConfirmationEmail(input: {
   return result.data;
 }
 
+export async function sendContactSupportEmail(input: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  subject: string;
+  message: string;
+}) {
+  const resend = getResend();
+  const deliveryMode = process.env.EMAIL_DELIVERY_MODE || "resend";
+  const cleanSubject = input.subject.replace(/[\r\n]+/g, " ").trim();
+
+  if (!resend || deliveryMode === "console") {
+    if (process.env.NODE_ENV === "production" && deliveryMode !== "console") {
+      throw new Error("RESEND_API_KEY is not configured.");
+    }
+    console.info("[email:development] Contact message", {
+      from: input.email,
+      subject: cleanSubject,
+    });
+    return { id: "development-console" };
+  }
+
+  const safeMessage = escapeHtml(input.message).replace(/\r?\n/g, "<br>");
+  const result = await resend.emails.send({
+    from: process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>",
+    to: process.env.CONTACT_TO_EMAIL || "support@cuvvapolicies.com",
+    replyTo: input.email,
+    subject: `[Tempify support] ${cleanSubject}`,
+    html: emailShell(
+      "New support request",
+      `<p style="font-size:16px;line-height:1.7"><strong>From:</strong> ${escapeHtml(input.firstName)} ${escapeHtml(input.lastName)} (${escapeHtml(input.email)})</p><p style="font-size:16px;line-height:1.7"><strong>Subject:</strong> ${escapeHtml(cleanSubject)}</p><div style="margin-top:22px;padding:18px;background:#f7f8fb;border-radius:12px;font-size:15px;line-height:1.7">${safeMessage}</div>`,
+    ),
+  });
+
+  if (result.error) throw new Error(result.error.message);
+  return result.data;
+}
+
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => {
     const map: Record<string, string> = {

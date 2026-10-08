@@ -13,7 +13,13 @@ type ReviewQuote = {
   address: { line1: string; line2?: string; city: string; postcode: string };
   licence: { number: string; type: string; heldFor: string; vehicleValue: string; reasonForCover: string };
   modifications: string[];
-  pricing: { amount: number; currency: string };
+  pricing: {
+    amount: number;
+    baseAmount?: number;
+    surchargeAmount?: number;
+    pastStartSurchargeApplied?: boolean;
+    currency: string;
+  };
 };
 
 export function ReviewClient({ quote }: { quote: ReviewQuote }) {
@@ -24,7 +30,8 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
   const [promo, setPromo] = useState("");
   const [promoMessage, setPromoMessage] = useState("");
 
-  const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.pricing.currency }).format(quote.pricing.amount);
+  const moneyFormatter = new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.pricing.currency });
+  const money = moneyFormatter.format(quote.pricing.amount);
 
   async function beginCheckout(skipSessionCheck = false) {
     setError("");
@@ -88,6 +95,12 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
           <div className="overflow-hidden rounded-2xl border border-orange-400/20 bg-gradient-to-br from-[#ef5a08] to-[#c93808] p-5 sm:p-6">
             <div className="flex items-center gap-2 font-extrabold"><CreditCard size={18} /> Total price</div>
             <div className="mt-5 rounded-xl bg-white/10 py-6 text-center text-4xl font-black sm:text-5xl">{money}</div>
+            {quote.pricing.pastStartSurchargeApplied && Number(quote.pricing.surchargeAmount) > 0 && (
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-white/20 bg-black/10 px-4 py-3 text-sm">
+                <span>Past start surcharge included</span>
+                <strong>+{moneyFormatter.format(Number(quote.pricing.surchargeAmount))}</strong>
+              </div>
+            )}
             <div className="mt-4 rounded-xl border border-white/20 p-4">
               <label className="mb-2 flex items-center gap-2 text-sm font-bold"><Tag size={16} /> Promo code</label>
               <div className="flex gap-2"><input value={promo} onChange={(e) => setPromo(e.target.value)} className="min-w-0 flex-1 rounded-lg border-0 bg-white px-3 text-sm text-slate-900 outline-none" placeholder="Promo code" /><button type="button" onClick={() => setPromoMessage(promo ? "This code is not currently active." : "Enter a promo code first.")} className="rounded-lg bg-white px-4 py-3 text-sm font-extrabold text-orange-600">Apply</button></div>

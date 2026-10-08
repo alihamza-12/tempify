@@ -12,9 +12,9 @@ export function SiteFooter() {
         <div className="flex flex-wrap justify-center gap-5 text-xs text-slate-500">
           <Link href="/privacy-policy" className="hover:text-slate-300">Privacy Policy</Link>
           <Link href="/terms-of-service" className="hover:text-slate-300">Terms of Service</Link>
-          <Link href="/return-policy" className="hover:text-slate-300">Refund Policy</Link>
+          <Link href="/return-policy" className="hover:text-slate-300">Return Policy</Link>
         </div>
-        <p className="text-xs text-slate-600">© {new Date().getFullYear()} Tempify</p>
+        <p className="text-xs text-slate-600">© {new Date().getFullYear()} TEMPIFY. All rights reserved.</p>
       </div>
     </footer>
   );

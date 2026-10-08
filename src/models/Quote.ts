@@ -46,8 +46,11 @@ const quoteSchema = new Schema(
     modifications: { type: [String], default: [] },
     pricing: {
       amount: { type: Number, required: true },
+      baseAmount: Number,
+      surchargeAmount: { type: Number, default: 0 },
+      pastStartSurchargeApplied: { type: Boolean, default: false },
       currency: { type: String, default: "GBP" },
-      calculationVersion: { type: String, default: "v1" },
+      calculationVersion: { type: String, default: "v2-past-start" },
     },
     status: { type: String, enum: ["draft", "checkout", "paid", "expired"], default: "draft" },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },

@@ -5,6 +5,7 @@ import { VerifiedVehicle } from "@/models/VerifiedVehicle";
 import type { VehicleResult } from "./types";
 
 const REGCHECK_URL = "https://www.regcheck.org.uk/api/reg.asmx/Check";
+const REGCHECK_CREDITS_URL = "https://www.regcheck.org.uk/ajax/getcredits.aspx";
 
 export function cleanRegistration(value: string) {
   return String(value || "")
@@ -15,7 +16,7 @@ export function cleanRegistration(value: string) {
 
 export async function findOrVerifyVehicle(value: string): Promise<{
   vehicle: VehicleResult;
-  origin: "verified-cache" | "provider";
+  origin: "tempify-verified-cache" | "legacy-verified-cache" | "provider";
 }> {
   const registration = cleanRegistration(value);
   if (!/^[A-Z0-9]{2,8}$/.test(registration)) {
@@ -32,7 +33,7 @@ export async function findOrVerifyVehicle(value: string): Promise<{
   }).lean();
 
   if (cached) {
-    return { vehicle: presentVehicle(cached), origin: "verified-cache" };
+    return { vehicle: presentVehicle(cached), origin: "tempify-verified-cache" };
   }
 
   // Read from the existing Cuvva collection only when the row includes the
@@ -46,7 +47,7 @@ export async function findOrVerifyVehicle(value: string): Promise<{
   if (legacy?.regCheckData && Object.keys(legacy.regCheckData).length > 0) {
     const normalized = normalizeProviderVehicle(legacy.regCheckData, registration);
     const migrated = await cacheProviderVehicle(normalized, legacy.regCheckData);
-    return { vehicle: presentVehicle(migrated), origin: "verified-cache" };
+    return { vehicle: presentVehicle(migrated), origin: "legacy-verified-cache" };
   }
 
   const raw = await requestRegCheck(registration);
@@ -56,7 +57,9 @@ export async function findOrVerifyVehicle(value: string): Promise<{
 }
 
 async function requestRegCheck(registration: string) {
-  const usernames = String(process.env.REGCHECK_USERNAMES || process.env.REGCHECK_USERNAME || "")
+  const usernames = String(
+    process.env.REGCHECK_USERNAMES || process.env.REGCHECK_USERNAME || "",
+  )
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -69,50 +72,147 @@ async function requestRegCheck(registration: string) {
     );
   }
 
-  let lastStatus = 503;
-  for (const username of usernames) {
-    const query = new URLSearchParams({ RegistrationNumber: registration, username });
+  let networkFailures = 0;
+  let exhaustedAccounts = 0;
+  let unavailableAccounts = 0;
+  let plateNotFound = false;
+
+  for (const [accountIndex, username] of usernames.entries()) {
+    const query = new URLSearchParams({
+      RegistrationNumber: registration,
+      username,
+    });
+
     const response = await fetch(`${REGCHECK_URL}?${query}`, {
-      headers: { Accept: "application/xml, text/xml" },
+      headers: { Accept: "application/xml, text/xml, */*" },
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
-    }).catch(() => null);
+    }).catch((error) => {
+      networkFailures += 1;
+      console.warn("[RegCheck] request failed", {
+        account: accountIndex + 1,
+        error: error instanceof Error ? error.message : "Network error",
+      });
+      return null;
+    });
 
     if (!response) continue;
-    lastStatus = response.status;
-    if ([401, 403, 429].includes(response.status)) continue;
-    if (!response.ok) {
-      throw new VehicleLookupError(
-        "We could not find that vehicle. Check the registration and try again.",
-        response.status === 404 ? 404 : 422,
-        "VEHICLE_NOT_FOUND",
-      );
+
+    if (response.ok) {
+      const text = await response.text();
+      try {
+        const parsed = new XMLParser({
+          ignoreAttributes: false,
+          parseTagValue: false,
+        }).parse(text);
+        const jsonText = findVehicleJson(parsed);
+        if (!jsonText) throw new Error("vehicleJson was missing");
+        const raw =
+          typeof jsonText === "string" ? JSON.parse(jsonText) : jsonText;
+        if (!raw || typeof raw !== "object") {
+          throw new Error("invalid provider payload");
+        }
+        return raw as Record<string, unknown>;
+      } catch (error) {
+        console.error("[RegCheck] response parsing failed", {
+          account: accountIndex + 1,
+          error: error instanceof Error ? error.message : "Parse error",
+        });
+        throw new VehicleLookupError(
+          "The vehicle provider returned an invalid response. Please try again.",
+          502,
+          "INVALID_PROVIDER_RESPONSE",
+        );
+      }
     }
 
-    const text = await response.text();
-    try {
-      const parsed = new XMLParser({ ignoreAttributes: false, parseTagValue: false }).parse(text);
-      const jsonText = findVehicleJson(parsed);
-      if (!jsonText) throw new Error("vehicleJson was missing");
-      const raw = typeof jsonText === "string" ? JSON.parse(jsonText) : jsonText;
-      if (!raw || typeof raw !== "object") throw new Error("invalid provider payload");
-      return raw as Record<string, unknown>;
-    } catch {
-      throw new VehicleLookupError(
-        "The vehicle provider returned an invalid response. Please try again.",
-        502,
-        "INVALID_PROVIDER_RESPONSE",
-      );
+    // RegCheck commonly uses HTTP 500 both for an unknown plate and an account
+    // with no remaining credits. Check the account balance before deciding.
+    if (response.status >= 500) {
+      const balance = await getRegCheckCreditBalance(username);
+      console.info("[RegCheck] lookup rejected", {
+        account: accountIndex + 1,
+        providerStatus: response.status,
+        remainingCredits: balance ?? "unknown",
+      });
+
+      if (balance !== null && balance <= 0) {
+        exhaustedAccounts += 1;
+        continue;
+      }
+
+      // A positive balance means the provider accepted the account but could
+      // not resolve this registration. Trying more accounts would waste credit.
+      if (balance !== null && balance > 0) {
+        plateNotFound = true;
+        break;
+      }
+
+      // If the credit endpoint is unavailable, try the next configured account
+      // before reporting a provider outage.
+      unavailableAccounts += 1;
+      continue;
     }
+
+    if ([401, 403, 429].includes(response.status)) {
+      unavailableAccounts += 1;
+      console.warn("[RegCheck] account unavailable", {
+        account: accountIndex + 1,
+        providerStatus: response.status,
+      });
+      continue;
+    }
+
+    if (response.status === 400 || response.status === 404) {
+      plateNotFound = true;
+      break;
+    }
+
+    unavailableAccounts += 1;
   }
 
+  if (plateNotFound) {
+    throw new VehicleLookupError(
+      "We could not find that vehicle. Check the registration and try again.",
+      404,
+      "VEHICLE_NOT_FOUND",
+    );
+  }
+
+  if (exhaustedAccounts === usernames.length) {
+    throw new VehicleLookupError(
+      "All configured vehicle lookup accounts are out of credits.",
+      503,
+      "LOOKUP_CREDITS_EXHAUSTED",
+    );
+  }
+
+  console.error("[RegCheck] all accounts failed", {
+    configuredAccounts: usernames.length,
+    exhaustedAccounts,
+    unavailableAccounts,
+    networkFailures,
+  });
   throw new VehicleLookupError(
-    lastStatus === 429
-      ? "Vehicle lookup is busy. Please wait and try again."
-      : "Vehicle lookup is temporarily unavailable.",
+    "Vehicle lookup is temporarily unavailable. Check the server logs and RegCheck account status.",
     503,
     "PROVIDER_UNAVAILABLE",
   );
+}
+
+async function getRegCheckCreditBalance(username: string) {
+  try {
+    const query = new URLSearchParams({ username });
+    const response = await fetch(`${REGCHECK_CREDITS_URL}?${query}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) return null;
+    const value = Number((await response.text()).trim());
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 function findVehicleJson(value: unknown): unknown {
