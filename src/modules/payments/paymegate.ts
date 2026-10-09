@@ -11,8 +11,11 @@ type PayMeGateOrder = {
 };
 
 function configuration() {
-  const apiKey = process.env.PAYMEGATE_API_KEY;
-  if (!apiKey) throw new PaymentConfigurationError("Online payment setup is pending.");
+  const apiKey = process.env.PAYMEGATE_API_KEY?.trim();
+  if (!apiKey) {
+    console.error("[payment] PAYMEGATE_API_KEY is not configured");
+    throw new PaymentConfigurationError("Online payment is temporarily unavailable. Please try again later.");
+  }
   return {
     apiKey,
     baseUrl: (process.env.PAYMEGATE_BASE_URL || "https://api.paymegate.com").replace(/\/$/, ""),

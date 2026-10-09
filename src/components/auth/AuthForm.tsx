@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { ArrowRight, CircleAlert, Eye, EyeOff, LoaderCircle, LockKeyhole, MailCheck } from "lucide-react";
+import { notifyAuthSessionChanged } from "@/lib/auth-events";
 
 type AuthUser = { id: string; email: string; fullName: string; role: string };
 type AuthMode = "register" | "login" | "otp";
@@ -111,6 +112,7 @@ export function AuthForm({
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to verify code.");
+        notifyAuthSessionChanged();
         onAuthenticated(data.user);
       } else {
         const response = await fetch("/api/auth/login", {
@@ -120,6 +122,7 @@ export function AuthForm({
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to sign in.");
+        notifyAuthSessionChanged();
         onAuthenticated(data.user);
       }
     } catch (submitError) {

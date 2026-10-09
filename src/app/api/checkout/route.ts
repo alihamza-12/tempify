@@ -45,7 +45,11 @@ export async function POST(request: Request) {
     try {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL;
       if (!appUrl || !appUrl.startsWith("https://")) {
-        throw Object.assign(new Error("Set NEXT_PUBLIC_APP_URL to the public HTTPS website URL before enabling payment."), { status: 503 });
+        console.error("[payment] NEXT_PUBLIC_APP_URL must be the public HTTPS website URL");
+        throw Object.assign(
+          new Error("Online payment is temporarily unavailable. Please try again later."),
+          { status: 503 },
+        );
       }
       const remote = await createPayMeGateOrder({
         externalId: publicId,

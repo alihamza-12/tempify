@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
+import { AUTH_SESSION_CHANGED_EVENT } from "@/lib/auth-events";
 
 type User = { fullName: string; email: string } | null;
 
@@ -11,10 +12,39 @@ export function SessionNav() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/auth/session", { credentials: "include" })
-      .then((response) => (response.ok ? response.json() : { user: null }))
-      .then((data) => setUser(data.user || null))
-      .finally(() => setLoaded(true));
+    let active = true;
+
+    async function loadSession() {
+      try {
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const data = response.ok ? await response.json() : { user: null };
+        if (active) setUser(data.user || null);
+      } catch {
+        if (active) setUser(null);
+      } finally {
+        if (active) setLoaded(true);
+      }
+    }
+
+    const refreshSession = () => void loadSession();
+    const refreshVisibleSession = () => {
+      if (document.visibilityState === "visible") void loadSession();
+    };
+
+    void loadSession();
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, refreshSession);
+    window.addEventListener("focus", refreshSession);
+    document.addEventListener("visibilitychange", refreshVisibleSession);
+
+    return () => {
+      active = false;
+      window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, refreshSession);
+      window.removeEventListener("focus", refreshSession);
+      document.removeEventListener("visibilitychange", refreshVisibleSession);
+    };
   }, []);
 
   if (!loaded) return <div className="h-10 w-24 animate-pulse rounded-full bg-white/5" />;
