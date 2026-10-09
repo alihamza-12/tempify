@@ -78,7 +78,7 @@ export default function PrivacyPage() {
         <LegalSection number={5} title="Sharing, Retention and Your Rights" tone="green">
           <p>Information is shared only where needed with service providers such as hosting, database, email, vehicle-data and payment providers, or where required by law. Providers receive only the information needed for their role and are expected to protect it appropriately.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <LegalInfoCard icon={Building2} title="Service Providers" tone="green">MongoDB, Vercel, Resend, RegCheck and PayMeGate may process relevant information for their services.</LegalInfoCard>
+            <LegalInfoCard icon={Building2} title="Service Providers" tone="green">Approved hosting, database, email, vehicle-data and payment providers may process relevant information only for their contracted services.</LegalInfoCard>
             <LegalInfoCard icon={FileLock2} title="Retention" tone="green">Records are kept only as long as reasonably needed for service, legal, security, tax and dispute purposes.</LegalInfoCard>
             <LegalInfoCard icon={Cookie} title="Your Choices" tone="green">You may have rights to access, correct, erase, restrict, object or request portability, subject to applicable exemptions.</LegalInfoCard>
           </div>

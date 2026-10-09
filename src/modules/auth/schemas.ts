@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+function capitalizeWords(value: string) {
+  return value.replace(/(^|[\s'-])([a-z])/g, (_match, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`);
+}
+
 export const requestOtpSchema = z.object({
-  firstName: z.string().trim().min(2).max(50),
-  lastName: z.string().trim().min(2).max(50),
+  firstName: z.string().trim().min(2).max(50).transform(capitalizeWords),
+  lastName: z.string().trim().min(2).max(50).transform(capitalizeWords),
   email: z.string().trim().toLowerCase().email().max(254),
   password: z
     .string()

@@ -50,7 +50,7 @@ export async function createPayMeGateOrder(input: {
   if (!response.ok || !body?.data?.checkoutUrl) {
     console.error("[paymegate:create]", response.status, body?.error?.code || "unknown");
     throw new PaymentProviderError(
-      body?.error?.message || "The payment provider could not create this checkout.",
+      "Secure payment is temporarily unavailable. Please try again.",
       response.status,
     );
   }

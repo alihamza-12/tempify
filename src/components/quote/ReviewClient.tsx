@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Apple, ArrowLeft, CheckCircle2, CreditCard, LoaderCircle, LockKeyhole, Smartphone, Tag, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCircle2, CreditCard, LoaderCircle, Tag, UserRound } from "lucide-react";
 import { AuthModal } from "@/components/auth/AuthModal";
 
 type ReviewQuote = {
@@ -108,15 +108,6 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/8 bg-[#111a29] p-5">
-            <div className="flex items-center gap-2 text-sm font-extrabold"><LockKeyhole size={17} className="text-emerald-400" /> Secure hosted checkout</div>
-            <p className="mt-2 text-xs leading-5 text-slate-500">Eligible payment methods are shown by PayMeGate for your order, device, region and amount.</p>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <PaymentBadge icon={CreditCard} label="Card" />
-              <PaymentBadge icon={Apple} label="Apple Pay" />
-              <PaymentBadge icon={Smartphone} label="Google Pay" />
-            </div>
-          </div>
         </div>
 
         {error && <div className="error-box mt-5">{error}</div>}
@@ -135,4 +126,3 @@ function ReviewSection({ icon: Icon, title, children }: { icon: typeof UserRound
   return <section className="rounded-2xl border border-white/10 bg-[#172233] p-4 sm:p-5"><h2 className="mb-3 flex items-center gap-2.5 font-extrabold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400"><Icon size={16} /></span>{title}</h2>{children}</section>;
 }
 function ReviewRow({ label, value }: { label: string; value: string }) { return <div className="flex flex-col gap-1 border-t border-white/8 py-3 text-sm first:border-0 sm:flex-row sm:items-start sm:justify-between"><span className="text-slate-500">{label}</span><span className="max-w-md text-left font-bold text-white sm:text-right">{value}</span></div>; }
-function PaymentBadge({ icon: Icon, label }: { icon: typeof CreditCard; label: string }) { return <div className="flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-white/8 bg-white/[.025] text-center text-[11px] font-bold text-slate-300"><Icon size={18} className="text-orange-400" />{label}</div>; }

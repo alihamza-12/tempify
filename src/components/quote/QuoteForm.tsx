@@ -18,7 +18,7 @@ import { SectionCard } from "./SectionCard";
 import type { VehicleResult } from "@/modules/vehicles/types";
 
 type FormValues = {
-  title: "Mr" | "Mrs" | "Miss" | "Ms" | "Mx";
+  title: "" | "Mr" | "Mrs" | "Miss" | "Ms" | "Mx";
   firstName: string;
   lastName: string;
   dateOfBirth: string;
@@ -30,10 +30,10 @@ type FormValues = {
   city: string;
   postcode: string;
   licenceNumber: string;
-  licenceType: "Full UK" | "Provisional UK" | "International" | "Full EU";
-  heldFor: "Under 1 Year" | "1-2 Years" | "2-4 Years" | "5-10 Years" | "10+ Years";
-  vehicleValue: "£1,000 - £5,000" | "£5,000 - £10,000" | "£10,000 - £20,000" | "£20,000 - £30,000" | "£30,000 - £50,000" | "£50,000 - £80,000" | "£80,000+";
-  reasonForCover: "Borrowing" | "Buying/Selling/Testing" | "Learning" | "Maintenance" | "Other";
+  licenceType: "" | "Full UK" | "Provisional UK" | "International" | "Full EU";
+  heldFor: "" | "Under 1 Year" | "1-2 Years" | "2-4 Years" | "5-10 Years" | "10+ Years";
+  vehicleValue: "" | "£1,000 - £5,000" | "£5,000 - £10,000" | "£10,000 - £20,000" | "£20,000 - £30,000" | "£30,000 - £50,000" | "£50,000 - £80,000" | "£80,000+";
+  reasonForCover: "" | "Borrowing" | "Buying/Selling/Testing" | "Learning" | "Maintenance" | "Other";
 };
 
 const occupations = ["Accountant", "Architect", "Builder", "Business Owner", "Carer", "Chef", "Civil Servant", "Consultant", "Delivery Driver", "Designer", "Doctor", "Electrician", "Engineer", "Mechanic", "Nurse", "Office Manager", "Retail Worker", "Software Developer", "Student", "Teacher"];
@@ -82,11 +82,11 @@ export function QuoteForm({ registration }: { registration: string }) {
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
-      title: "Mr",
-      licenceType: "Full UK",
-      heldFor: "1-2 Years",
-      vehicleValue: "£5,000 - £10,000",
-      reasonForCover: "Borrowing",
+      title: "",
+      licenceType: "",
+      heldFor: "",
+      vehicleValue: "",
+      reasonForCover: "",
     },
   });
 
@@ -221,7 +221,7 @@ export function QuoteForm({ registration }: { registration: string }) {
 
       <SectionCard icon={UserRound} title="Driver details">
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Title" error={errors.title?.message}><select className="field" {...register("title", { required: true })}>{["Mr", "Mrs", "Miss", "Ms", "Mx"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
+          <FormField label="Title" error={errors.title?.message}><select className="field" {...register("title", { required: "Select a title" })}><option value="" disabled>Select title</option>{["Mr", "Mrs", "Miss", "Ms", "Mx"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
           <FormField label="First name" error={errors.firstName?.message}>
             <input className="field" autoComplete="given-name" {...register("firstName", { required: "First name is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 60, message: "Enter no more than 60 characters" } })} onChange={(event) => updateCapitalizedField("firstName", event.target.value)} />
           </FormField>
@@ -268,10 +268,10 @@ export function QuoteForm({ registration }: { registration: string }) {
       <SectionCard icon={CreditCard} title="Licence & vehicle">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Driving licence number" error={errors.licenceNumber?.message}><input className="field uppercase" autoComplete="off" maxLength={24} {...register("licenceNumber", { required: "Licence number is required", minLength: { value: 8, message: "Enter at least 8 characters" }, maxLength: { value: 24, message: "Enter no more than 24 characters" }, setValueAs: (value) => String(value || "").trim().toUpperCase() })} /></FormField>
-          <FormField label="Licence type"><select className="field" {...register("licenceType")}>{["Full UK", "Provisional UK", "International", "Full EU"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
-          <FormField label="Licence held for"><select className="field" {...register("heldFor")}>{["Under 1 Year", "1-2 Years", "2-4 Years", "5-10 Years", "10+ Years"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
-          <FormField label="Vehicle value"><select className="field" {...register("vehicleValue")}>{["£1,000 - £5,000", "£5,000 - £10,000", "£10,000 - £20,000", "£20,000 - £30,000", "£30,000 - £50,000", "£50,000 - £80,000", "£80,000+"].map((item) => <option key={item}>{item}</option>)}</select></FormField>
-          <div className="sm:col-span-2"><FormField label="Reason for cover"><select className="field" {...register("reasonForCover")}>{["Borrowing", "Buying/Selling/Testing", "Learning", "Maintenance", "Other"].map((item) => <option key={item}>{item}</option>)}</select></FormField></div>
+          <FormField label="Licence type" error={errors.licenceType?.message}><select className="field" {...register("licenceType", { required: "Select a licence type" })}><option value="" disabled>Select licence type</option>{["Full UK", "Provisional UK", "International", "Full EU"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
+          <FormField label="Licence held for" error={errors.heldFor?.message}><select className="field" {...register("heldFor", { required: "Select how long the licence has been held" })}><option value="" disabled>Select licence history</option>{["Under 1 Year", "1-2 Years", "2-4 Years", "5-10 Years", "10+ Years"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
+          <FormField label="Vehicle value" error={errors.vehicleValue?.message}><select className="field" {...register("vehicleValue", { required: "Select the vehicle value" })}><option value="" disabled>Select vehicle value</option>{["£1,000 - £5,000", "£5,000 - £10,000", "£10,000 - £20,000", "£20,000 - £30,000", "£30,000 - £50,000", "£50,000 - £80,000", "£80,000+"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
+          <div className="sm:col-span-2"><FormField label="Reason for cover" error={errors.reasonForCover?.message}><select className="field" {...register("reasonForCover", { required: "Select a reason for cover" })}><option value="" disabled>Select reason for cover</option>{["Borrowing", "Buying/Selling/Testing", "Learning", "Maintenance", "Other"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField></div>
         </div>
       </SectionCard>
 

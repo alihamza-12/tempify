@@ -1,9 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, LoaderCircle, LockKeyhole, MailCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LoaderCircle, LockKeyhole, MailCheck } from "lucide-react";
 
 type AuthUser = { id: string; email: string; fullName: string; role: string };
+
+function capitalizeWords(value: string) {
+  return value.replace(/(^|[\s'-])([a-z])/g, (_match, prefix: string, letter: string) => `${prefix}${letter.toUpperCase()}`);
+}
 
 export function AuthForm({
   initialEmail = "",
@@ -17,6 +21,7 @@ export function AuthForm({
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -34,7 +39,13 @@ export function AuthForm({
         const response = await fetch("/api/auth/request-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ firstName, lastName, email, password, acceptedTerms: accepted }),
+          body: JSON.stringify({
+            firstName: capitalizeWords(firstName.trim()),
+            lastName: capitalizeWords(lastName.trim()),
+            email: email.trim().toLowerCase(),
+            password,
+            acceptedTerms: accepted,
+          }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to send verification code.");
@@ -45,7 +56,7 @@ export function AuthForm({
         const response = await fetch("/api/auth/verify-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, code }),
+          body: JSON.stringify({ email: email.trim().toLowerCase(), code }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to verify code.");
@@ -54,7 +65,7 @@ export function AuthForm({
         const response = await fetch("/api/auth/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Unable to sign in.");
@@ -80,13 +91,25 @@ export function AuthForm({
       <form onSubmit={submit} className="space-y-4">
         {mode === "register" && (
           <div className="grid grid-cols-2 gap-3">
-            <label><span className="label">First name</span><input className="field" value={firstName} onChange={(e) => setFirstName(e.target.value)} required /></label>
-            <label><span className="label">Last name</span><input className="field" value={lastName} onChange={(e) => setLastName(e.target.value)} required /></label>
+            <label><span className="label">First name</span><input className="field" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(capitalizeWords(e.target.value))} required /></label>
+            <label><span className="label">Last name</span><input className="field" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(capitalizeWords(e.target.value))} required /></label>
           </div>
         )}
 
-        {mode !== "otp" && <label className="block"><span className="label">Email address</span><input type="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>}
-        {mode !== "otp" && <label className="block"><span className="label">Password</span><input type="password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} minLength={mode === "register" ? 10 : 1} required /><span className="mt-1.5 block text-[11px] text-slate-500">{mode === "register" ? "At least 10 characters with uppercase, lowercase and a number." : ""}</span></label>}
+        {mode !== "otp" && <label className="block"><span className="label">Email address</span><input type="email" inputMode="email" autoComplete="email" className="field" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>}
+        {mode !== "otp" && (
+          <div className="block">
+            <label htmlFor="auth-password" className="label">Password</label>
+            <div className="relative">
+              <LockKeyhole aria-hidden="true" size={18} className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input id="auth-password" type={showPassword ? "text" : "password"} className="field !pl-11 !pr-12" autoComplete={mode === "register" ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} minLength={mode === "register" ? 10 : 1} required />
+              <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/8 hover:text-orange-300" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
+                {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+              </button>
+            </div>
+            {mode === "register" && <span className="mt-1.5 block text-[11px] text-slate-500">At least 10 characters with uppercase, lowercase and a number.</span>}
+          </div>
+        )}
 
         {mode === "register" && (
           <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-400">
@@ -110,7 +133,7 @@ export function AuthForm({
       {mode !== "otp" && (
         <p className="mt-5 text-center text-sm text-slate-500">
           {mode === "register" ? "Already have an account?" : "New to Tempify?"}{" "}
-          <button type="button" onClick={() => { setMode(mode === "register" ? "login" : "register"); setError(""); }} className="font-bold text-orange-400 underline">{mode === "register" ? "Sign in" : "Create account"}</button>
+          <button type="button" onClick={() => { setMode(mode === "register" ? "login" : "register"); setShowPassword(false); setError(""); }} className="font-bold text-orange-400 underline">{mode === "register" ? "Sign in" : "Create account"}</button>
         </p>
       )}
       {mode === "otp" && <button type="button" onClick={() => setMode("register")} className="mt-4 w-full text-center text-sm font-bold text-slate-400 underline">Use a different email</button>}
