@@ -59,9 +59,9 @@ export async function connectToDatabase() {
 }
 
 /**
- * Read-only connection to the existing Cuvva database. Tempify uses only the
- * provider-backed `vehicles` collection through this connection; Cuvva users
- * and all other Cuvva application data remain separate.
+ * Restricted connection to the existing Cuvva database. Tempify reads and
+ * synchronizes only provider-backed rows in `vehicles`; Cuvva users and all
+ * other Cuvva application data remain separate.
  */
 export async function connectToCuvvaVehicleDatabase() {
   if (cuvvaCache.conn) return cuvvaCache.conn;

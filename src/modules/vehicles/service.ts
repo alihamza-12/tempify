@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { Types } from "mongoose";
 import { connectToCuvvaVehicleDatabase, connectToDatabase } from "@/lib/db";
 import { VerifiedVehicle } from "@/models/VerifiedVehicle";
 import type { VehicleResult } from "./types";
@@ -32,6 +33,7 @@ export async function findOrVerifyVehicle(value: string): Promise<{
   }).lean();
 
   if (cached) {
+    await syncTempifyVehicleToCuvvaIfNeeded(cached as Record<string, unknown>);
     return { vehicle: presentVehicle(cached), origin: "tempify-verified-cache" };
   }
 
@@ -58,13 +60,17 @@ export async function findOrVerifyVehicle(value: string): Promise<{
 
   if (legacy?.regCheckData && Object.keys(legacy.regCheckData).length > 0) {
     const normalized = normalizeProviderVehicle(legacy.regCheckData, registration);
-    const migrated = await cacheProviderVehicle(normalized, legacy.regCheckData);
+    const migrated = await cacheProviderVehicle(normalized, legacy.regCheckData, true);
     return { vehicle: presentVehicle(migrated), origin: "legacy-verified-cache" };
   }
 
+  // Validate dual-cache configuration before spending a RegCheck credit.
+  requireCuvvaVehicleOwnerId();
+
   const raw = await requestRegCheck(registration);
   const normalized = normalizeProviderVehicle(raw, registration);
-  const saved = await cacheProviderVehicle(normalized, raw);
+  const cuvvaSynced = await tryCacheProviderVehicleInCuvva(normalized, raw);
+  const saved = await cacheProviderVehicle(normalized, raw, cuvvaSynced);
   return { vehicle: presentVehicle(saved), origin: "provider" };
 }
 
@@ -281,10 +287,178 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(parsed) && String(value ?? "").trim() ? parsed : undefined;
 }
 
-async function cacheProviderVehicle(
-  normalized: ReturnType<typeof normalizeProviderVehicle>,
+type NormalizedProviderVehicle = ReturnType<typeof normalizeProviderVehicle>;
+
+type CuvvaFuelType = "PETROL" | "DIESEL" | "ELECTRIC" | "HYBRID";
+
+function requireCuvvaVehicleOwnerId() {
+  const value = String(process.env.CUVVA_VEHICLE_OWNER_ID || "").trim();
+  if (!Types.ObjectId.isValid(value)) {
+    throw new VehicleLookupError(
+      "Shared vehicle storage is not configured. Please contact support.",
+      503,
+      "CUVVA_VEHICLE_SYNC_NOT_CONFIGURED",
+    );
+  }
+  return new Types.ObjectId(value);
+}
+
+function normalizeCuvvaFuelType(value: string | undefined): CuvvaFuelType | undefined {
+  const fuel = String(value || "").trim().toUpperCase();
+  if (!fuel) return undefined;
+  if (fuel.includes("HYBRID") || (fuel.includes("ELECTRIC") && /PETROL|DIESEL/.test(fuel))) {
+    return "HYBRID";
+  }
+  if (fuel.includes("ELECTRIC")) return "ELECTRIC";
+  if (fuel.includes("DIESEL") || fuel.includes("HEAVY OIL")) return "DIESEL";
+  if (fuel.includes("PETROL") || fuel.includes("GASOLINE")) return "PETROL";
+  return undefined;
+}
+
+function dateValue(value: unknown): Date | undefined {
+  const text = textValue(value);
+  if (!text) return undefined;
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+export function buildCuvvaVerifiedVehicleUpdate(
+  normalized: NormalizedProviderVehicle,
+  providerPayload: Record<string, unknown>,
+  ownerId: Types.ObjectId,
+  now = new Date(),
+) {
+  const fuelType = normalizeCuvvaFuelType(normalized.fuelType);
+  if (!normalized.year || !fuelType) {
+    throw new Error("RegCheck did not return a Cuvva-compatible year and fuel type.");
+  }
+
+  const optionalProviderFields: Record<string, unknown> = {
+    description: normalized.description,
+    colour: normalized.colour,
+    vehicleIdentificationNumber: textValue(providerPayload.VehicleIdentificationNumber).toUpperCase(),
+    engineCapacityCC: normalized.engineCapacityCC,
+    bodyStyle: normalized.bodyStyle,
+    variant: normalized.variant,
+    transmission: normalized.transmission,
+    numberOfDoors: normalized.numberOfDoors,
+    numberOfSeats: normalized.numberOfSeats,
+    vehicleInsuranceGroup: normalized.vehicleInsuranceGroup,
+    vehicleInsuranceGroupOutOf: normalized.vehicleInsuranceGroupOutOf,
+    abiCode: normalized.abiCode,
+    engineCode: textValue(providerPayload.EngineCode).toUpperCase(),
+    engineNumber: textValue(providerPayload.EngineNumber).toUpperCase(),
+    immobiliser: textValue(providerPayload.Immobiliser),
+    indicativeValue: numberValue(textValue(providerPayload.IndicativeValue)),
+    driverSide: textValue(providerPayload.DriverSide),
+    imageUrl: normalized.imageUrl,
+    powerBHP: numberValue(providerPayload.PowerBHP),
+    topSpeed: numberValue(providerPayload.TopSpeed),
+    cylinders: numberValue(providerPayload.Cylinders),
+    fuelConsumptionMPG: numberValue(
+      providerPayload.FuelConsumptionMPG ?? providerPayload.CombinedMPG,
+    ),
+    motStatus: textValue(providerPayload.MotStatus ?? providerPayload.MOTStatus),
+    motExpiryDate: dateValue(providerPayload.MotExpiryDate ?? providerPayload.MOTExpiryDate),
+    taxStatus: textValue(providerPayload.TaxStatus),
+    taxDueDate: dateValue(providerPayload.TaxDueDate),
+    registrationKeeper: textValue(providerPayload.RegistrationKeeper),
+    v5cIssueDate: dateValue(providerPayload.V5CIssueDate),
+    co2Emissions: numberValue(providerPayload.CO2Emissions),
+    euroStatus: textValue(providerPayload.EuroStatus).toUpperCase(),
+    wheelplan: textValue(providerPayload.Wheelplan).toUpperCase(),
+  };
+
+  const setFields: Record<string, unknown> = {
+    registration: normalized.registration,
+    make: normalized.make,
+    model: normalized.model,
+    year: normalized.year,
+    fuelType,
+    lookupSource: "regcheck",
+    regCheckData: providerPayload,
+    verified: true,
+    verificationSource: "regcheck",
+    verifiedAt: now,
+    updatedAt: now,
+  };
+  const unsetFields: Record<string, ""> = {};
+
+  for (const [field, value] of Object.entries(optionalProviderFields)) {
+    if (value === undefined || value === null || value === "") {
+      unsetFields[field] = "";
+    } else {
+      setFields[field] = value;
+    }
+  }
+
+  return {
+    $set: setFields,
+    ...(Object.keys(unsetFields).length ? { $unset: unsetFields } : {}),
+    $setOnInsert: {
+      createdBy: ownerId,
+      associatedAdmins: [ownerId],
+      removedForAdmins: [],
+      createdAt: now,
+    },
+  };
+}
+
+async function tryCacheProviderVehicleInCuvva(
+  normalized: NormalizedProviderVehicle,
   providerPayload: Record<string, unknown>,
 ) {
+  try {
+    const ownerId = requireCuvvaVehicleOwnerId();
+    const cuvvaDatabase = await connectToCuvvaVehicleDatabase();
+    const update = buildCuvvaVerifiedVehicleUpdate(normalized, providerPayload, ownerId);
+    await cuvvaDatabase.collection("vehicles").updateOne(
+      { registration: normalized.registration },
+      update,
+      { upsert: true },
+    );
+    return true;
+  } catch (error) {
+    console.error("[Vehicle cache] could not synchronize verified vehicle to Cuvva", {
+      registration: normalized.registration,
+      error: error instanceof Error ? error.message : "Unknown database error",
+    });
+    return false;
+  }
+}
+
+async function syncTempifyVehicleToCuvvaIfNeeded(document: Record<string, unknown>) {
+  if (document.cuvvaSynced === true) return;
+
+  const providerPayload = document.providerPayload;
+  if (!providerPayload || typeof providerPayload !== "object" || Array.isArray(providerPayload)) {
+    return;
+  }
+
+  const registration = cleanRegistration(String(document.registration || ""));
+  const normalized = normalizeProviderVehicle(
+    providerPayload as Record<string, unknown>,
+    registration,
+  );
+  const synchronized = await tryCacheProviderVehicleInCuvva(
+    normalized,
+    providerPayload as Record<string, unknown>,
+  );
+
+  if (synchronized) {
+    await VerifiedVehicle.updateOne(
+      { _id: document._id },
+      { $set: { cuvvaSynced: true, cuvvaSyncedAt: new Date() } },
+    );
+  }
+}
+
+async function cacheProviderVehicle(
+  normalized: NormalizedProviderVehicle,
+  providerPayload: Record<string, unknown>,
+  cuvvaSynced: boolean,
+) {
+  const now = new Date();
   return VerifiedVehicle.findOneAndUpdate(
     { registration: normalized.registration },
     {
@@ -292,8 +466,10 @@ async function cacheProviderVehicle(
         ...normalized,
         source: "regcheck",
         verified: true,
-        verifiedAt: new Date(),
+        verifiedAt: now,
         providerPayload,
+        cuvvaSynced,
+        cuvvaSyncedAt: cuvvaSynced ? now : null,
       },
     },
     { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },

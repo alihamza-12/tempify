@@ -23,6 +23,8 @@ const verifiedVehicleSchema = new Schema(
     verified: { type: Boolean, default: true, required: true },
     verifiedAt: { type: Date, required: true },
     providerPayload: { type: Schema.Types.Mixed, required: true },
+    cuvvaSynced: { type: Boolean, default: false, required: true },
+    cuvvaSyncedAt: { type: Date, default: null },
   },
   { timestamps: true, collection: "tempify_verified_vehicles" },
 );
