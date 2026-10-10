@@ -1,6 +1,5 @@
-import mongoose from "mongoose";
 import { XMLParser } from "fast-xml-parser";
-import { connectToDatabase } from "@/lib/db";
+import { connectToCuvvaVehicleDatabase, connectToDatabase } from "@/lib/db";
 import { VerifiedVehicle } from "@/models/VerifiedVehicle";
 import type { VehicleResult } from "./types";
 
@@ -36,13 +35,26 @@ export async function findOrVerifyVehicle(value: string): Promise<{
     return { vehicle: presentVehicle(cached), origin: "tempify-verified-cache" };
   }
 
-  // Read from the existing Cuvva collection only when the row includes the
-  // original RegCheck payload. Manually-entered rows are intentionally ignored.
-  const legacy = await mongoose.connection.collection("vehicles").findOne({
-    registration,
-    lookupSource: "regcheck",
-    regCheckData: { $exists: true, $type: "object" },
-  });
+  // Read from the existing Cuvva database through its dedicated read-only
+  // connection. Tempify never reads or writes the Cuvva users collection.
+  let legacy: { regCheckData?: Record<string, unknown> } | null;
+  try {
+    const cuvvaDatabase = await connectToCuvvaVehicleDatabase();
+    legacy = await cuvvaDatabase
+      .collection<{ regCheckData?: Record<string, unknown> }>("vehicles")
+      .findOne({
+        registration,
+        lookupSource: "regcheck",
+        regCheckData: { $exists: true, $type: "object" },
+      });
+  } catch (error) {
+    console.error("[Vehicle cache] existing Cuvva vehicle database is unavailable", error);
+    throw new VehicleLookupError(
+      "The verified vehicle cache is temporarily unavailable. Please try again.",
+      503,
+      "VEHICLE_DATABASE_UNAVAILABLE",
+    );
+  }
 
   if (legacy?.regCheckData && Object.keys(legacy.regCheckData).length > 0) {
     const normalized = normalizeProviderVehicle(legacy.regCheckData, registration);

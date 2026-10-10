@@ -1,12 +1,18 @@
-import mongoose from "mongoose";
+import mongoose, { type Connection } from "mongoose";
 
 type MongooseCache = {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
 };
 
+type ConnectionCache = {
+  conn: Connection | null;
+  promise: Promise<Connection> | null;
+};
+
 const globalWithMongoose = globalThis as typeof globalThis & {
   mongooseCache?: MongooseCache;
+  cuvvaVehicleDatabaseCache?: ConnectionCache;
 };
 
 const cache = globalWithMongoose.mongooseCache ?? {
@@ -14,14 +20,24 @@ const cache = globalWithMongoose.mongooseCache ?? {
   promise: null,
 };
 
-globalWithMongoose.mongooseCache = cache;
+const cuvvaCache = globalWithMongoose.cuvvaVehicleDatabaseCache ?? {
+  conn: null,
+  promise: null,
+};
 
+globalWithMongoose.mongooseCache = cache;
+globalWithMongoose.cuvvaVehicleDatabaseCache = cuvvaCache;
+
+/**
+ * Tempify's private application database. Users, quotes, orders, OTP tokens and
+ * Tempify's provider-verified vehicle cache are stored here.
+ */
 export async function connectToDatabase() {
   if (cache.conn) return cache.conn;
 
   const uri = process.env.MONGODB_URI;
   if (!uri) {
-    throw new Error("MONGODB_URI is not configured.");
+    throw new Error("MONGODB_URI is not configured for the Tempify database.");
   }
 
   if (!cache.promise) {
@@ -40,4 +56,35 @@ export async function connectToDatabase() {
   }
 
   return cache.conn;
+}
+
+/**
+ * Read-only connection to the existing Cuvva database. Tempify uses only the
+ * provider-backed `vehicles` collection through this connection; Cuvva users
+ * and all other Cuvva application data remain separate.
+ */
+export async function connectToCuvvaVehicleDatabase() {
+  if (cuvvaCache.conn) return cuvvaCache.conn;
+
+  const uri = process.env.CUVVA_MONGODB_URI;
+  if (!uri) {
+    throw new Error("CUVVA_MONGODB_URI is not configured for the shared vehicle database.");
+  }
+
+  if (!cuvvaCache.promise) {
+    cuvvaCache.promise = mongoose.createConnection(uri, {
+      bufferCommands: false,
+      maxPoolSize: 5,
+      serverSelectionTimeoutMS: 10_000,
+    }).asPromise();
+  }
+
+  try {
+    cuvvaCache.conn = await cuvvaCache.promise;
+  } catch (error) {
+    cuvvaCache.promise = null;
+    throw error;
+  }
+
+  return cuvvaCache.conn;
 }
