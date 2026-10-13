@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# Never commit real environment files. Keep the safe template in Git.
 .env*
+!.env.example
 
 # vercel
 .vercel

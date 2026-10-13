@@ -71,7 +71,18 @@ export async function findOrVerifyVehicle(value: string): Promise<{
   }
 
   // Validate shared-record ownership before spending a RegCheck credit.
-  const ownerId = requireSharedIntegrationOwnerId();
+  const ownerId = parseSharedIntegrationOwnerId();
+  const integrationOwner = await database.collection("users").findOne(
+    { _id: ownerId, role: "Super Admin", status: "Active" },
+    { projection: { _id: 1 } },
+  );
+  if (!integrationOwner) {
+    throw new VehicleLookupError(
+      "Shared vehicle storage is not configured with an active Cuvva Super Admin. Please contact support.",
+      503,
+      "SHARED_VEHICLE_OWNER_NOT_CONFIGURED",
+    );
+  }
   const raw = await requestRegCheck(registration);
   const normalized = normalizeProviderVehicle(raw, registration);
   const verifiedAt = new Date();
@@ -322,11 +333,11 @@ type NormalizedProviderVehicle = ReturnType<typeof normalizeProviderVehicle>;
 
 type CuvvaFuelType = "PETROL" | "DIESEL" | "ELECTRIC" | "HYBRID";
 
-function requireSharedIntegrationOwnerId() {
-  const value = String(
-    process.env.SHARED_INTEGRATION_OWNER_ID || process.env.CUVVA_VEHICLE_OWNER_ID || "",
-  ).trim();
-  if (!Types.ObjectId.isValid(value)) {
+export function parseSharedIntegrationOwnerId(
+  configuredValue = process.env.SHARED_INTEGRATION_OWNER_ID,
+) {
+  const value = String(configuredValue || "").trim();
+  if (!Types.ObjectId.isValid(value) || /^0{24}$/.test(value)) {
     throw new VehicleLookupError(
       "Shared vehicle storage is not configured. Please contact support.",
       503,

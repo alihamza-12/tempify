@@ -12,18 +12,20 @@ A production-oriented, modular Next.js application for provider-verified UK vehi
 - Verified-only vehicle cache; manually entered legacy vehicles are ignored
 - Multi-section quote journey and isolated pricing module
 - Email OTP registration and bcrypt password hashes
-- Shared `users` collection compatibility with the supplied Cuvva database
+- One shared Cuvva/Tempify database with the same `users` and verified `vehicles` collections
+- Editable customer profile and quote pre-fill using the shared customer record
 - HTTP-only JWT session cookie
 - Authentication gate before checkout
 - PayMeGate order creation, hosted checkout redirect, signed webhook verification, idempotency, and status reconciliation
-- Resend OTP and post-payment confirmation emails
+- Resend OTP, post-payment confirmation, and validated support-form emails
+- Responsive animated legal/support pages with signed robot verification
 - Account order history
 - PWA manifest and post-payment add-to-home-screen instructions
 - Unit tests for pricing, registration normalization, and webhook HMAC verification
 
 ## Important business/compliance boundary
 
-The application intentionally rejects a cover start time in the past. It does not generate backdated policies, fake insurance documents, or AI-generated documents. The post-payment message is a purchase confirmation. Before representing any output as an insurance policy, connect the application to an authorized insurer/underwriter and have the complete product, wording, pricing, eligibility, regulatory disclosures, and fulfillment reviewed by qualified UK insurance/compliance professionals.
+The quote form allows a customer to select a past start date/time and applies a higher price on the server. A quote or payment confirmation does not by itself establish cover for an elapsed period, and the application does not generate fake insurance documents or AI-generated documents. Before representing any output as an insurance policy, connect the application to an authorized insurer/underwriter and have the complete product, wording, historical-start eligibility, pricing, regulatory disclosures, and fulfillment reviewed by qualified UK insurance/compliance professionals.
 
 ## Requirements
 
@@ -57,13 +59,16 @@ Copy `.env.example` and configure:
 
 | Variable | Purpose |
 |---|---|
-| `MONGODB_URI` | MongoDB connection string |
-| `SESSION_SECRET` | Signs the secure session cookie |
+| `MONGODB_URI` | The exact existing local Cuvva database URI; both projects use this one database |
+| `SHARED_INTEGRATION_OWNER_ID` | Existing active Cuvva Super Admin ObjectId assigned as `createdBy` for provider-created shared vehicles |
+| `SESSION_SECRET` | Signs the Tempify host-only secure session cookie |
 | `REGCHECK_USERNAMES` | Comma-separated RegCheck usernames |
 | `RESEND_API_KEY` | Server-side Resend key |
 | `EMAIL_FROM` | `Tempify <auto@cuvvapolicies.com>` |
+| `CONTACT_TO_EMAIL` | Receives validated support/contact-form messages |
 | `EMAIL_DELIVERY_MODE` | `console` locally, `resend` in production |
 | `NEXT_PUBLIC_APP_URL` | Public HTTPS site origin |
+| `LIVE_POLICY_CHECKOUT_ENABLED` | Must remain `false` until written policy-issuance authority and fulfilment are confirmed |
 | `PAYMEGATE_API_KEY` | PayMeGate live merchant key |
 | `PAYMEGATE_WEBHOOK_SECRET` | One-time signing secret returned on webhook registration |
 | `PAYMEGATE_BASE_URL` | Defaults to `https://api.paymegate.com` |
@@ -71,53 +76,75 @@ Copy `.env.example` and configure:
 
 Do not prefix API keys, database credentials, or webhook secrets with `NEXT_PUBLIC_`.
 
-## Sharing the existing MongoDB database
+## One shared MongoDB database
 
-The application uses the existing `users` collection shape and bcrypt passwords, so customers can use the same credentials when both applications point to the same database.
-
-It reads existing vehicle data only when:
-
-- `lookupSource` is `regcheck`, and
-- the original non-empty `regCheckData` object exists.
-
-Manual vehicle rows are never returned by customer lookup. Newly verified lookups are stored in `tempify_verified_vehicles` to avoid mutating the existing admin-owned `vehicles` model.
-
-### Vercel cannot use your server's `localhost`
-
-If MongoDB is installed locally on a Hostinger server, this will **not** work from Vercel:
+Cuvva and Tempify use the exact same local MongoDB database URI. If Cuvva uses:
 
 ```env
-MONGODB_URI=mongodb://localhost:27017/database
+MONGODB_URI=mongodb://APP_USER:PASSWORD@127.0.0.1:27017/cuvva?authSource=admin
 ```
 
-`localhost` on Vercel means the temporary Vercel function itself, not Hostinger. Recommended solution:
+Tempify uses the same value:
 
-1. Move the database to MongoDB Atlas.
-2. Update the existing Cuvva backend and this project to the same Atlas URI/database.
-3. Configure a database user with a strong password and least-privilege access.
-4. Never expose an unauthenticated MongoDB port publicly.
+```env
+MONGODB_URI=mongodb://APP_USER:PASSWORD@127.0.0.1:27017/cuvva?authSource=admin
+SHARED_INTEGRATION_OWNER_ID=EXISTING_ACTIVE_CUVVA_SUPER_ADMIN_OBJECT_ID
+```
 
-A private network/tunnel is another option, but it requires infrastructure outside this single Vercel project.
+Equivalent business entities are not duplicated:
+
+- Both applications authenticate against the same `users` collection. A Tempify customer receives the Cuvva-compatible `Customer` role and can use the same email/password in the Cuvva customer application.
+- Both applications use the same `vehicles` collection and original `regCheckData` verification marker.
+- The existing `policies` collection remains the future shared destination for authorised policy issuance.
+- Tempify-only workflow state—pending OTPs, quotes and PayMeGate orders/webhook idempotency—uses support collections in this same database because these records have no safe equivalent in Cuvva.
+
+Tempify never writes to a second logical database and no longer writes a duplicate `tempify_verified_vehicles` cache. Keep MongoDB bound to localhost/private networking and never expose port `27017` publicly.
+
+During setup, obtain the shared integration owner once:
+
+```javascript
+use CUVVA_DATABASE_NAME
+db.users.findOne({ role: "Super Admin", status: "Active" }, { _id: 1 })
+```
+
+Vehicle lookup order is:
+
+1. Check the shared `vehicles` collection for `lookupSource="regcheck"` and a non-empty original `regCheckData` object.
+2. Return that verified record to either project without spending a RegCheck credit.
+3. Call RegCheck only when the shared verified record does not exist.
+4. Upsert the provider result into the same shared `vehicles` row with `lookupSource="regcheck"`, original `regCheckData`, `verified=true`, verification timestamps and the configured integration owner.
+5. Display the saved provider result.
+
+Manual/unverified vehicle rows are never authoritative. An existing manual row for the same registration is upgraded only after a successful RegCheck response. No Cuvva source-code changes are required.
+
+## Customer details and checkout gate
+
+The quote page loads an authenticated customer's shared profile and keeps every field editable. It includes name, email, date of birth, gender, occupation, mobile, driving licence, licence history, residential address/county/postcode, fixed country `GB`, and optional last-four card digits. The account page edits the same shared `users` record.
+
+The server checks the complete customer, licence, verified vehicle and VIN data again before creating a PayMeGate order. Client-side form completion alone cannot bypass this check.
+
+Because written Cuvva/Wakam issuance authority was not confirmed, `LIVE_POLICY_CHECKOUT_ENABLED` defaults to `false`. This build does not create a Cuvva policy or legal certificate. If an already-existing/test order is reconciled as paid, the email attachment is a clearly marked payment receipt that is **not proof of insurance**, and the order remains `blocked_pending_authority`. Do not enable live collection until the approved insurer/underwriter supplies written authority and a separately reviewed fulfilment module has been implemented.
 
 ## PayMeGate activation
 
-Payment code is implemented but remains safely unavailable until credentials are configured.
+Payment code is implemented but remains safely unavailable until both written issuance authority and credentials are configured.
 
-1. Create a PayMeGate merchant account.
-2. Configure and verify the payout wallet and network in the PayMeGate dashboard.
-3. Create a scoped API key with order permissions.
-4. Add `PAYMEGATE_API_KEY` to Vercel.
-5. Deploy to obtain the production HTTPS URL.
-6. Register this webhook URL:
+1. Obtain written authority and implement/review the authorised insurer fulfilment module before setting `LIVE_POLICY_CHECKOUT_ENABLED=true`.
+2. Use the business/client-controlled PayMeGate merchant account.
+3. Configure a self-custodial EVM payout wallet (for example Coinbase Wallet, MetaMask, Trust Wallet, or Rabby). Do not use a Coinbase Exchange deposit address.
+4. Create the server API key (recommended name: `Tempify Production`). Leave refund/cancellation, product management, wallet update, and webhook URL update permissions OFF.
+5. Save `PAYMEGATE_API_KEY` only in the server's protected production environment.
+6. Deploy Tempify on its separate HTTPS root domain.
+7. Register this webhook URL:
 
 ```text
 https://YOUR-DOMAIN/api/webhooks/paymegate
 ```
 
-7. Save the one-time signing secret immediately as `PAYMEGATE_WEBHOOK_SECRET`.
-8. Set `NEXT_PUBLIC_APP_URL=https://YOUR-DOMAIN`.
-9. Confirm supported currency and active methods using the merchant dashboard/API.
-10. Test with a small live order and verify webhook, reconciliation, email, and wallet settlement.
+8. Save the one-time signing secret immediately as `PAYMEGATE_WEBHOOK_SECRET`.
+9. Set `NEXT_PUBLIC_APP_URL=https://YOUR-DOMAIN`.
+10. Confirm supported currency and active methods using the merchant dashboard/API.
+11. Only after authority and fulfilment approval, test with a controlled order and verify webhook, reconciliation, receipt email and wallet settlement.
 
 The browser receives only PayMeGate's hosted `checkoutUrl`. API keys and payment-provider details never reach client JavaScript. Apple Pay, Google Pay, card, and other methods are eligibility-dependent and are displayed by PayMeGate's hosted checkout.
 
@@ -128,10 +155,11 @@ Create a **separate Resend API key for this project** while using the already ve
 ```env
 RESEND_API_KEY=re_...
 EMAIL_FROM=Tempify <auto@cuvvapolicies.com>
+CONTACT_TO_EMAIL=support@cuvvapolicies.com
 EMAIL_DELIVERY_MODE=resend
 ```
 
-OTP emails are sent during registration. The payment confirmation email is sent only after a signed PayMeGate webhook or direct server reconciliation confirms `PAID`.
+OTP emails are sent during registration. A payment confirmation email and attached PDF payment receipt are sent only after a signed PayMeGate webhook or direct server reconciliation confirms `PAID`. The receipt is explicitly marked as not proof of insurance. No Cuvva/Wakam policy certificate or policy-wording attachments are generated while issuance authority remains unconfirmed. The contact form sends validated, rate-limited messages to `CONTACT_TO_EMAIL` with the customer address set as the reply-to address.
 
 ## Quality checks
 
@@ -142,14 +170,56 @@ npm test
 npm run build
 ```
 
-## Deploy to Vercel
+## Same-server production deployment
 
-1. Push this folder to a private GitHub repository.
-2. Import it into Vercel as a Next.js project.
-3. Add all production environment variables in Vercel Project Settings.
-4. Deploy.
-5. Configure the PayMeGate webhook after the final HTTPS domain is active.
-6. Run the go-live checklist above.
+Keep the existing Cuvva application and its port unchanged. The applications do not need different public IP addresses: both domains can point to the server's same public IP, while Nginx routes each hostname to a different localhost application port. Deploy Tempify from its own directory and run it on a second port, for example `127.0.0.1:3001`:
+
+```bash
+npm ci
+npm run build
+NODE_ENV=production PORT=3001 npm run start
+```
+
+Use systemd or PM2 to keep that process running. Store production secrets in a protected server environment file (mode `600`), not in Git. Set `NEXT_PUBLIC_APP_URL` to the final Tempify HTTPS origin.
+
+Create a separate Nginx virtual host for the new root domain and proxy it only to Tempify:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR-TEMPIFY-DOMAIN;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
+```
+
+After its DNS A record (and AAAA only when the server has working IPv6) resolves to the server, validate and enable Nginx, then issue HTTPS:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d YOUR-TEMPIFY-DOMAIN -d www.YOUR-TEMPIFY-DOMAIN
+```
+
+Configure the PayMeGate webhook only after the final HTTPS endpoint responds successfully.
+
+### Free separate domain option
+
+For a zero-cost independently registered address, `.pp.ua` is currently available from accredited registrars such as [NIC.UA](https://nic.ua/en/domains/.pp.ua). For example, `tempify.pp.ua` is independent of the Cuvva domain and supports normal DNS and HTTPS. Registration and renewal are free, but the registrant must activate it by phone/Telegram, renew it manually each year, and accept that registrant contact details are public. Check the official [PP.UA rules](https://pp.ua/eng/policy.html) before using it for a production payment site.
+
+At the registrar, create an `A` record for `@` pointing to the server's public IPv4 address and a `CNAME` for `www` pointing to the root name. Use that hostname in the Nginx `server_name`, `NEXT_PUBLIC_APP_URL`, Certbot command and PayMeGate webhook URL. Do not point DNS directly to port `3001`; DNS points to the server IP and Nginx performs the port routing.
+
+If a conventional address such as `.com`, `.co.uk` or `.uk` is required, it is not permanently free; use an at-cost registrar such as [Cloudflare Registrar](https://www.cloudflare.com/domains/) rather than GoDaddy.
 
 ## Key folders
 
@@ -158,9 +228,12 @@ src/app                  Pages and API Route Handlers
 src/components           UI grouped by feature
 src/models               Mongoose models
 src/modules/auth         OTP/account business logic
-src/modules/vehicles     Verified lookup and provider adapter
+src/modules/profile      Shared Cuvva/Tempify customer profile validation
+src/modules/contact      Contact-form validation
+src/modules/vehicles     Shared verified lookup and provider adapter
 src/modules/quotes       Validation and pricing
 src/modules/payments     PayMeGate client, HMAC, fulfillment
+src/modules/documents    Payment receipt generation (not proof of insurance)
 src/modules/email        Resend templates and delivery
 src/lib                  Database, sessions, HTTP helpers, rate limiting
 ```

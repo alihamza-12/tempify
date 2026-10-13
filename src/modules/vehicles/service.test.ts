@@ -1,10 +1,25 @@
 import { Types } from "mongoose";
 import { describe, expect, it } from "vitest";
-import { buildSharedVerifiedVehicleUpdate, cleanRegistration } from "./service";
+import {
+  buildSharedVerifiedVehicleUpdate,
+  cleanRegistration,
+  parseSharedIntegrationOwnerId,
+} from "./service";
 
 describe("vehicle registration normalisation", () => {
   it("removes spaces and punctuation and uppercases", () => {
     expect(cleanRegistration(" sj18-obw ")).toBe("SJ18OBW");
+  });
+});
+
+describe("shared integration owner configuration", () => {
+  it("accepts a real ObjectId and rejects the all-zero placeholder", () => {
+    expect(String(parseSharedIntegrationOwnerId("507f1f77bcf86cd799439011"))).toBe(
+      "507f1f77bcf86cd799439011",
+    );
+    expect(() => parseSharedIntegrationOwnerId("000000000000000000000000")).toThrow(
+      "Shared vehicle storage is not configured",
+    );
   });
 });
 
