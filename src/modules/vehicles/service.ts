@@ -1,7 +1,6 @@
 import { XMLParser } from "fast-xml-parser";
 import { Types } from "mongoose";
-import { connectToCuvvaVehicleDatabase, connectToDatabase } from "@/lib/db";
-import { VerifiedVehicle } from "@/models/VerifiedVehicle";
+import { connectToDatabase } from "@/lib/db";
 import type { VehicleResult } from "./types";
 
 const REGCHECK_URL = "https://www.regcheck.org.uk/api/reg.asmx/Check";
@@ -16,41 +15,40 @@ export function cleanRegistration(value: string) {
 
 export async function findOrVerifyVehicle(value: string): Promise<{
   vehicle: VehicleResult;
-  origin: "tempify-verified-cache" | "legacy-verified-cache" | "provider";
+  origin: "shared-verified-cache" | "provider";
 }> {
   const registration = cleanRegistration(value);
   if (!/^[A-Z0-9]{2,8}$/.test(registration)) {
     throw new VehicleLookupError("Enter a valid UK registration number.", 400, "INVALID_REGISTRATION");
   }
 
-  await connectToDatabase();
+  const database = (await connectToDatabase()).connection;
 
-  const cached = await VerifiedVehicle.findOne({
-    registration,
-    verified: true,
-    source: "regcheck",
-    providerPayload: { $exists: true, $ne: null },
-  }).lean();
-
-  if (cached) {
-    await syncTempifyVehicleToCuvvaIfNeeded(cached as Record<string, unknown>);
-    return { vehicle: presentVehicle(cached), origin: "tempify-verified-cache" };
-  }
-
-  // Read from the existing Cuvva database through its dedicated read-only
-  // connection. Tempify never reads or writes the Cuvva users collection.
-  let legacy: { regCheckData?: Record<string, unknown> } | null;
+  // Cuvva and Tempify now use this one verified vehicle registry. Manual rows
+  // are ignored unless a successful RegCheck payload has upgraded the record.
+  let cached: {
+    _id: Types.ObjectId;
+    regCheckData?: Record<string, unknown>;
+    verifiedAt?: Date;
+    updatedAt?: Date;
+    vehicleIdentificationNumber?: string;
+  } | null;
   try {
-    const cuvvaDatabase = await connectToCuvvaVehicleDatabase();
-    legacy = await cuvvaDatabase
-      .collection<{ regCheckData?: Record<string, unknown> }>("vehicles")
+    cached = await database
+      .collection<{
+        _id: Types.ObjectId;
+        regCheckData?: Record<string, unknown>;
+        verifiedAt?: Date;
+        updatedAt?: Date;
+        vehicleIdentificationNumber?: string;
+      }>("vehicles")
       .findOne({
         registration,
         lookupSource: "regcheck",
         regCheckData: { $exists: true, $type: "object" },
       });
   } catch (error) {
-    console.error("[Vehicle cache] existing Cuvva vehicle database is unavailable", error);
+    console.error("[Vehicle cache] shared vehicle collection is unavailable", error);
     throw new VehicleLookupError(
       "The verified vehicle cache is temporarily unavailable. Please try again.",
       503,
@@ -58,20 +56,52 @@ export async function findOrVerifyVehicle(value: string): Promise<{
     );
   }
 
-  if (legacy?.regCheckData && Object.keys(legacy.regCheckData).length > 0) {
-    const normalized = normalizeProviderVehicle(legacy.regCheckData, registration);
-    const migrated = await cacheProviderVehicle(normalized, legacy.regCheckData, true);
-    return { vehicle: presentVehicle(migrated), origin: "legacy-verified-cache" };
+  if (cached?.regCheckData && Object.keys(cached.regCheckData).length > 0) {
+    const normalized = normalizeProviderVehicle(cached.regCheckData, registration);
+    return {
+      vehicle: presentVehicle({
+        ...normalized,
+        _id: cached._id,
+        vehicleIdentificationNumber:
+          normalized.vehicleIdentificationNumber || cached.vehicleIdentificationNumber,
+        verifiedAt: cached.verifiedAt || cached.updatedAt || new Date(),
+      }),
+      origin: "shared-verified-cache",
+    };
   }
 
-  // Validate dual-cache configuration before spending a RegCheck credit.
-  requireCuvvaVehicleOwnerId();
-
+  // Validate shared-record ownership before spending a RegCheck credit.
+  const ownerId = requireSharedIntegrationOwnerId();
   const raw = await requestRegCheck(registration);
   const normalized = normalizeProviderVehicle(raw, registration);
-  const cuvvaSynced = await tryCacheProviderVehicleInCuvva(normalized, raw);
-  const saved = await cacheProviderVehicle(normalized, raw, cuvvaSynced);
-  return { vehicle: presentVehicle(saved), origin: "provider" };
+  const verifiedAt = new Date();
+  let sharedVehicleId: Types.ObjectId | undefined;
+
+  try {
+    const vehicles = database.collection("vehicles");
+    const update = buildSharedVerifiedVehicleUpdate(normalized, raw, ownerId, verifiedAt);
+    await vehicles.updateOne({ registration }, update, { upsert: true });
+    const saved = await vehicles.findOne(
+      { registration },
+      { projection: { _id: 1 } },
+    );
+    sharedVehicleId = saved?._id;
+  } catch (error) {
+    console.error("[Vehicle cache] could not save verified shared vehicle", {
+      registration,
+      error: error instanceof Error ? error.message : "Unknown database error",
+    });
+    throw new VehicleLookupError(
+      "The vehicle was verified but could not be safely saved. Please try again.",
+      503,
+      "VEHICLE_CACHE_WRITE_FAILED",
+    );
+  }
+
+  return {
+    vehicle: presentVehicle({ ...normalized, _id: sharedVehicleId, verifiedAt }),
+    origin: "provider",
+  };
 }
 
 async function requestRegCheck(registration: string) {
@@ -272,6 +302,7 @@ function normalizeProviderVehicle(raw: Record<string, unknown>, registration: st
     vehicleInsuranceGroupOutOf: numberValue(raw.VehicleInsuranceGroupOutOf),
     abiCode: textValue(raw.ABICode),
     imageUrl: textValue(raw.ImageUrl),
+    vehicleIdentificationNumber: textValue(raw.VehicleIdentificationNumber).toUpperCase(),
   };
 }
 
@@ -291,13 +322,15 @@ type NormalizedProviderVehicle = ReturnType<typeof normalizeProviderVehicle>;
 
 type CuvvaFuelType = "PETROL" | "DIESEL" | "ELECTRIC" | "HYBRID";
 
-function requireCuvvaVehicleOwnerId() {
-  const value = String(process.env.CUVVA_VEHICLE_OWNER_ID || "").trim();
+function requireSharedIntegrationOwnerId() {
+  const value = String(
+    process.env.SHARED_INTEGRATION_OWNER_ID || process.env.CUVVA_VEHICLE_OWNER_ID || "",
+  ).trim();
   if (!Types.ObjectId.isValid(value)) {
     throw new VehicleLookupError(
       "Shared vehicle storage is not configured. Please contact support.",
       503,
-      "CUVVA_VEHICLE_SYNC_NOT_CONFIGURED",
+      "SHARED_VEHICLE_OWNER_NOT_CONFIGURED",
     );
   }
   return new Types.ObjectId(value);
@@ -322,7 +355,7 @@ function dateValue(value: unknown): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
-export function buildCuvvaVerifiedVehicleUpdate(
+export function buildSharedVerifiedVehicleUpdate(
   normalized: NormalizedProviderVehicle,
   providerPayload: Record<string, unknown>,
   ownerId: Types.ObjectId,
@@ -336,7 +369,7 @@ export function buildCuvvaVerifiedVehicleUpdate(
   const optionalProviderFields: Record<string, unknown> = {
     description: normalized.description,
     colour: normalized.colour,
-    vehicleIdentificationNumber: textValue(providerPayload.VehicleIdentificationNumber).toUpperCase(),
+    vehicleIdentificationNumber: normalized.vehicleIdentificationNumber,
     engineCapacityCC: normalized.engineCapacityCC,
     bodyStyle: normalized.bodyStyle,
     variant: normalized.variant,
@@ -404,78 +437,6 @@ export function buildCuvvaVerifiedVehicleUpdate(
   };
 }
 
-async function tryCacheProviderVehicleInCuvva(
-  normalized: NormalizedProviderVehicle,
-  providerPayload: Record<string, unknown>,
-) {
-  try {
-    const ownerId = requireCuvvaVehicleOwnerId();
-    const cuvvaDatabase = await connectToCuvvaVehicleDatabase();
-    const update = buildCuvvaVerifiedVehicleUpdate(normalized, providerPayload, ownerId);
-    await cuvvaDatabase.collection("vehicles").updateOne(
-      { registration: normalized.registration },
-      update,
-      { upsert: true },
-    );
-    return true;
-  } catch (error) {
-    console.error("[Vehicle cache] could not synchronize verified vehicle to Cuvva", {
-      registration: normalized.registration,
-      error: error instanceof Error ? error.message : "Unknown database error",
-    });
-    return false;
-  }
-}
-
-async function syncTempifyVehicleToCuvvaIfNeeded(document: Record<string, unknown>) {
-  if (document.cuvvaSynced === true) return;
-
-  const providerPayload = document.providerPayload;
-  if (!providerPayload || typeof providerPayload !== "object" || Array.isArray(providerPayload)) {
-    return;
-  }
-
-  const registration = cleanRegistration(String(document.registration || ""));
-  const normalized = normalizeProviderVehicle(
-    providerPayload as Record<string, unknown>,
-    registration,
-  );
-  const synchronized = await tryCacheProviderVehicleInCuvva(
-    normalized,
-    providerPayload as Record<string, unknown>,
-  );
-
-  if (synchronized) {
-    await VerifiedVehicle.updateOne(
-      { _id: document._id },
-      { $set: { cuvvaSynced: true, cuvvaSyncedAt: new Date() } },
-    );
-  }
-}
-
-async function cacheProviderVehicle(
-  normalized: NormalizedProviderVehicle,
-  providerPayload: Record<string, unknown>,
-  cuvvaSynced: boolean,
-) {
-  const now = new Date();
-  return VerifiedVehicle.findOneAndUpdate(
-    { registration: normalized.registration },
-    {
-      $set: {
-        ...normalized,
-        source: "regcheck",
-        verified: true,
-        verifiedAt: now,
-        providerPayload,
-        cuvvaSynced,
-        cuvvaSyncedAt: cuvvaSynced ? now : null,
-      },
-    },
-    { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
-  ).lean();
-}
-
 function presentVehicle(document: Record<string, unknown>): VehicleResult {
   return {
     registration: String(document.registration),
@@ -495,6 +456,8 @@ function presentVehicle(document: Record<string, unknown>): VehicleResult {
     vehicleInsuranceGroupOutOf: optionalNumber(document.vehicleInsuranceGroupOutOf),
     abiCode: optionalString(document.abiCode),
     imageUrl: optionalString(document.imageUrl),
+    vehicleIdentificationNumber: optionalString(document.vehicleIdentificationNumber),
+    databaseId: optionalString(document._id),
     source: "regcheck",
     verifiedAt: new Date(document.verifiedAt as Date).toISOString(),
   };

@@ -22,13 +22,16 @@ type FormValues = {
   firstName: string;
   lastName: string;
   dateOfBirth: string;
+  gender: "" | "Male" | "Female" | "Other" | "Prefer not to say";
   occupation: string;
   phone: string;
   email: string;
   line1: string;
   line2: string;
   city: string;
+  county: string;
   postcode: string;
+  lastFourDigits: string;
   licenceNumber: string;
   licenceType: "" | "Full UK" | "Provisional UK" | "International" | "Full EU";
   heldFor: "" | "Under 1 Year" | "1-2 Years" | "2-4 Years" | "5-10 Years" | "10+ Years";
@@ -63,7 +66,7 @@ function digitsOnly(value: string) {
   return value.replace(/\D/g, "").slice(0, 15);
 }
 
-type CapitalizedField = "firstName" | "lastName" | "occupation" | "line1" | "line2" | "city";
+type CapitalizedField = "firstName" | "lastName" | "occupation" | "line1" | "line2" | "city" | "county";
 
 export function QuoteForm({ registration }: { registration: string }) {
   const router = useRouter();
@@ -80,13 +83,15 @@ export function QuoteForm({ registration }: { registration: string }) {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormValues>({
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
       title: "",
+      gender: "",
       licenceType: "",
       heldFor: "",
       vehicleValue: "",
       reasonForCover: "",
+      lastFourDigits: "",
     },
   });
 
@@ -103,6 +108,40 @@ export function QuoteForm({ registration }: { registration: string }) {
       shouldValidate: Boolean(errors.phone),
     });
   }
+
+  useEffect(() => {
+    fetch("/api/profile", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((data) => {
+        const profile = data?.profile;
+        if (!profile) return;
+        reset({
+          title: profile.title || "",
+          firstName: profile.firstName || "",
+          lastName: profile.lastName || "",
+          dateOfBirth: profile.dateOfBirth || "",
+          gender: profile.gender || "",
+          occupation: profile.occupation || "",
+          phone: profile.phone || "",
+          email: profile.email || "",
+          line1: profile.address?.line1 || "",
+          line2: profile.address?.line2 || "",
+          city: profile.address?.city || "",
+          county: profile.address?.county || "",
+          postcode: profile.address?.postcode || "",
+          lastFourDigits: profile.lastFourDigits || "",
+          licenceNumber: profile.drivingLicenceNumber || "",
+          licenceType: profile.licenceType || "",
+          heldFor: profile.licenceHeldFor || "",
+          vehicleValue: "",
+          reasonForCover: "",
+        });
+      })
+      .catch(() => undefined);
+  }, [reset]);
 
   useEffect(() => {
     if (!registration) return;
@@ -143,6 +182,7 @@ export function QuoteForm({ registration }: { registration: string }) {
             firstName: capitalizeWords(values.firstName.trim()),
             lastName: capitalizeWords(values.lastName.trim()),
             dateOfBirth: values.dateOfBirth,
+            gender: values.gender,
             occupation: capitalizeWords(values.occupation.trim()),
             phone: digitsOnly(values.phone),
             email: values.email.trim().toLowerCase(),
@@ -151,10 +191,12 @@ export function QuoteForm({ registration }: { registration: string }) {
             line1: capitalizeWords(values.line1.trim()),
             line2: capitalizeWords((values.line2 || "").trim()),
             city: capitalizeWords(values.city.trim()),
+            county: capitalizeWords((values.county || "").trim()),
             postcode: values.postcode.trim().toUpperCase(),
           },
           licence: {
             number: values.licenceNumber,
+            lastFourDigits: values.lastFourDigits,
             type: values.licenceType,
             heldFor: values.heldFor,
             vehicleValue: values.vehicleValue,
@@ -229,6 +271,7 @@ export function QuoteForm({ registration }: { registration: string }) {
             <input className="field" autoComplete="family-name" {...register("lastName", { required: "Last name is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 60, message: "Enter no more than 60 characters" } })} onChange={(event) => updateCapitalizedField("lastName", event.target.value)} />
           </FormField>
           <FormField label="Date of birth" error={errors.dateOfBirth?.message}><input type="date" className="field" autoComplete="bday" {...register("dateOfBirth", { required: "Date of birth is required" })} /></FormField>
+          <FormField label="Gender" error={errors.gender?.message}><select className="field" {...register("gender", { required: "Select a gender" })}><option value="" disabled>Select gender</option>{["Male", "Female", "Other", "Prefer not to say"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
           <FormField label="Occupation" error={errors.occupation?.message}>
             <input className="field" list="occupations" placeholder="Search occupation…" autoComplete="organization-title" {...register("occupation", { required: "Occupation is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 100, message: "Enter no more than 100 characters" } })} onChange={(event) => updateCapitalizedField("occupation", event.target.value)} />
             <datalist id="occupations">{occupations.map((item) => <option key={item} value={item} />)}</datalist>
@@ -259,15 +302,20 @@ export function QuoteForm({ registration }: { registration: string }) {
           <FormField label="City / town" error={errors.city?.message}>
             <input className="field" autoComplete="address-level2" {...register("city", { required: "City is required", minLength: { value: 2, message: "Enter at least 2 characters" }, maxLength: { value: 80, message: "Enter no more than 80 characters" } })} onChange={(event) => updateCapitalizedField("city", event.target.value)} />
           </FormField>
+          <FormField label="County (optional)" error={errors.county?.message}>
+            <input className="field" autoComplete="address-level1" {...register("county", { maxLength: { value: 80, message: "Enter no more than 80 characters" } })} onChange={(event) => updateCapitalizedField("county", event.target.value)} />
+          </FormField>
           <FormField label="Postcode" error={errors.postcode?.message}>
             <input className="field uppercase" autoComplete="postal-code" maxLength={10} placeholder="SW1A 1AA" {...register("postcode", { required: "Postcode is required", minLength: { value: 5, message: "Enter a valid postcode" }, maxLength: { value: 10, message: "Enter a valid postcode" }, setValueAs: (value) => String(value || "").trim().toUpperCase() })} />
           </FormField>
+          <FormField label="Country"><input className="field" value="GB" readOnly /></FormField>
         </div>
       </SectionCard>
 
       <SectionCard icon={CreditCard} title="Licence & vehicle">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Driving licence number" error={errors.licenceNumber?.message}><input className="field uppercase" autoComplete="off" maxLength={24} {...register("licenceNumber", { required: "Licence number is required", minLength: { value: 8, message: "Enter at least 8 characters" }, maxLength: { value: 24, message: "Enter no more than 24 characters" }, setValueAs: (value) => String(value || "").trim().toUpperCase() })} /></FormField>
+          <FormField label="Last four payment-card digits (optional)" error={errors.lastFourDigits?.message}><input className="field" inputMode="numeric" maxLength={4} placeholder="0000" {...register("lastFourDigits", { pattern: { value: /^$|^\d{4}$/, message: "Enter exactly four digits or leave blank" }, setValueAs: (value) => String(value || "").replace(/\D/g, "").slice(0, 4) })} /></FormField>
           <FormField label="Licence type" error={errors.licenceType?.message}><select className="field" {...register("licenceType", { required: "Select a licence type" })}><option value="" disabled>Select licence type</option>{["Full UK", "Provisional UK", "International", "Full EU"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
           <FormField label="Licence held for" error={errors.heldFor?.message}><select className="field" {...register("heldFor", { required: "Select how long the licence has been held" })}><option value="" disabled>Select licence history</option>{["Under 1 Year", "1-2 Years", "2-4 Years", "5-10 Years", "10+ Years"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>
           <FormField label="Vehicle value" error={errors.vehicleValue?.message}><select className="field" {...register("vehicleValue", { required: "Select the vehicle value" })}><option value="" disabled>Select vehicle value</option>{["£1,000 - £5,000", "£5,000 - £10,000", "£10,000 - £20,000", "£20,000 - £30,000", "£30,000 - £50,000", "£50,000 - £80,000", "£80,000+"].map((item) => <option key={item} value={item}>{item}</option>)}</select></FormField>

@@ -28,6 +28,7 @@ export const createQuoteSchema = z.object({
     firstName: z.string().trim().min(2, "Enter a valid first name.").max(60).transform(capitalizeWords),
     lastName: z.string().trim().min(2, "Enter a valid last name.").max(60).transform(capitalizeWords),
     dateOfBirth: z.string().date(),
+    gender: z.enum(["Male", "Female", "Other", "Prefer not to say"]),
     occupation: z.string().trim().min(2, "Enter a valid occupation.").max(100).transform(capitalizeWords),
     phone: z.string().trim().regex(/^[0-9]{7,15}$/, "Enter a valid phone number using 7 to 15 digits only."),
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254),
@@ -36,10 +37,12 @@ export const createQuoteSchema = z.object({
     line1: z.string().trim().min(3, "Enter a valid address.").max(120).transform(capitalizeWords),
     line2: z.string().trim().max(120).optional().default("").transform(capitalizeWords),
     city: z.string().trim().min(2, "Enter a valid city or town.").max(80).transform(capitalizeWords),
+    county: z.string().trim().max(80).optional().default("").transform(capitalizeWords),
     postcode: z.string().trim().min(5, "Enter a valid postcode.").max(10).transform((value) => value.toUpperCase()),
   }),
   licence: z.object({
     number: z.string().trim().min(8, "Enter a valid driving licence number.").max(24).transform((value) => value.toUpperCase()),
+    lastFourDigits: z.union([z.literal(""), z.string().regex(/^\d{4}$/, "Enter exactly four card digits.")]).default(""),
     type: z.enum(["Full UK", "Provisional UK", "International", "Full EU"]),
     heldFor: z.enum(["Under 1 Year", "1-2 Years", "2-4 Years", "5-10 Years", "10+ Years"]),
     vehicleValue: z.enum([

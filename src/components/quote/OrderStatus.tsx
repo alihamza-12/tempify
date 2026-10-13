@@ -4,7 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, Clock3, Download, Home, LoaderCircle, MailCheck, Smartphone, TriangleAlert, UserRound } from "lucide-react";
 
-type OrderState = { orderId: string; status: string; amount: number; currency: string; paidAt: string | null };
+type OrderState = {
+  orderId: string;
+  status: string;
+  amount: number;
+  currency: string;
+  paidAt: string | null;
+  policyIssued: boolean;
+  fulfillmentStatus: string;
+};
 
 export function OrderStatus({ id, email }: { id: string; email: string }) {
   const [order, setOrder] = useState<OrderState | null>(null);
@@ -38,15 +46,22 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
     <div className="panel overflow-hidden rounded-[28px]">
       <div className="brand-gradient px-6 py-10 text-center">
         <CheckCircle2 size={52} className="mx-auto" />
-        <h1 className="mt-4 text-3xl font-black">Payment confirmed</h1>
-        <p className="mt-2 text-white/80">Your confirmation has been sent to {email}</p>
+        <h1 className="mt-4 text-3xl font-black">Payment received</h1>
+        <p className="mt-2 text-white/80">Your payment receipt has been sent to {email}</p>
       </div>
       <div className="space-y-5 p-5 sm:p-8">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Summary icon={MailCheck} label="Email" value="Confirmation sent" />
+          <Summary icon={MailCheck} label="Email" value="Receipt sent" />
           <Summary icon={UserRound} label="Username" value={email} />
           <Summary icon={Clock3} label="Amount paid" value={money} />
         </div>
+
+        {!order.policyIssued && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-100">
+            <strong className="block text-base text-red-300">No insurance policy or certificate has been issued</strong>
+            The email attachment is a payment receipt only and is not proof of insurance. Do not drive in reliance on this payment confirmation.
+          </div>
+        )}
 
         <div className="rounded-2xl border border-white/10 bg-[#172233] p-5">
           <h2 className="flex items-center gap-2 text-lg font-extrabold"><Smartphone size={19} className="text-orange-400" /> Add Tempify to your home screen</h2>

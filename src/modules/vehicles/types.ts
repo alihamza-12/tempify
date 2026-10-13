@@ -16,6 +16,8 @@ export type VehicleResult = {
   vehicleInsuranceGroupOutOf?: number;
   abiCode?: string;
   imageUrl?: string;
+  vehicleIdentificationNumber?: string;
+  databaseId?: string;
   source: "regcheck";
   verifiedAt: string;
 };

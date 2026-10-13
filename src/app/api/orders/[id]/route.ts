@@ -46,5 +46,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     amount: order.amount,
     currency: order.currency,
     paidAt: order.paidAt || null,
+    policyIssued: Boolean(order.policyId),
+    fulfillmentStatus:
+      order.fulfillmentStatus || (status === "paid" ? "blocked_pending_authority" : "pending_payment"),
   });
 }

@@ -1,6 +1,6 @@
 import { Types } from "mongoose";
 import { describe, expect, it } from "vitest";
-import { buildCuvvaVerifiedVehicleUpdate, cleanRegistration } from "./service";
+import { buildSharedVerifiedVehicleUpdate, cleanRegistration } from "./service";
 
 describe("vehicle registration normalisation", () => {
   it("removes spaces and punctuation and uppercases", () => {
@@ -20,7 +20,7 @@ describe("Cuvva verified vehicle synchronization", () => {
       VehicleIdentificationNumber: "wf0example",
     };
 
-    const update = buildCuvvaVerifiedVehicleUpdate(
+    const update = buildSharedVerifiedVehicleUpdate(
       {
         registration: "SJ18OBW",
         make: "Ford",
@@ -39,6 +39,7 @@ describe("Cuvva verified vehicle synchronization", () => {
         vehicleInsuranceGroupOutOf: 50,
         abiCode: "12345678",
         imageUrl: "https://example.test/car.jpg",
+        vehicleIdentificationNumber: "WF0EXAMPLE",
       },
       providerPayload,
       ownerId,

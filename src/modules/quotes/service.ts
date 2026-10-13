@@ -4,8 +4,9 @@ import { Quote } from "@/models/Quote";
 import { findOrVerifyVehicle } from "@/modules/vehicles/service";
 import { calculateQuotePrice, getEndDate } from "./pricing";
 import type { CreateQuoteInput } from "./schema";
+import { saveCustomerProfile } from "@/modules/profile/service";
 
-export async function createQuote(input: CreateQuoteInput) {
+export async function createQuote(input: CreateQuoteInput, userId?: string) {
   await connectToDatabase();
   const { vehicle } = await findOrVerifyVehicle(input.registration);
   const startAt = new Date(input.cover.startAt);
@@ -18,6 +19,24 @@ export async function createQuote(input: CreateQuoteInput) {
   const age = new Date().getUTCFullYear() - birthDate.getUTCFullYear();
   if (age < 17) throw new QuoteError("The driver must be at least 17 years old.", 400);
 
+  if (userId) {
+    await saveCustomerProfile(userId, {
+      title: input.driver.title,
+      firstName: input.driver.firstName,
+      lastName: input.driver.lastName,
+      email: input.driver.email,
+      dateOfBirth: input.driver.dateOfBirth,
+      gender: input.driver.gender,
+      occupation: input.driver.occupation,
+      phone: input.driver.phone,
+      drivingLicenceNumber: input.licence.number,
+      licenceType: input.licence.type,
+      licenceHeldFor: input.licence.heldFor,
+      lastFourDigits: input.licence.lastFourDigits,
+      address: { ...input.address, country: "GB" },
+    });
+  }
+
   // Pricing is always calculated on the server. Starts more than five minutes
   // in the past receive the configured historical-start surcharge.
   const pricing = calculateQuotePrice(input.cover.durationUnit, input.cover.durationValue, startAt);
@@ -26,6 +45,8 @@ export async function createQuote(input: CreateQuoteInput) {
 
   const quote = await Quote.create({
     publicId,
+    userId: userId || null,
+    vehicleId: vehicle.databaseId || null,
     vehicle: {
       registration: vehicle.registration,
       make: vehicle.make,
@@ -33,6 +54,7 @@ export async function createQuote(input: CreateQuoteInput) {
       colour: vehicle.colour,
       year: vehicle.year,
       fuelType: vehicle.fuelType,
+      vehicleIdentificationNumber: vehicle.vehicleIdentificationNumber,
       source: vehicle.source,
       verifiedAt: vehicle.verifiedAt,
     },

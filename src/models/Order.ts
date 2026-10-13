@@ -19,6 +19,12 @@ const orderSchema = new Schema(
     transactionUUID: String,
     transactionRef: String,
     paidAt: Date,
+    policyId: { type: Schema.Types.ObjectId, ref: "Policy", default: null },
+    fulfillmentStatus: {
+      type: String,
+      enum: ["pending_payment", "blocked_pending_authority", "issued"],
+      default: "pending_payment",
+    },
     processedEventIds: { type: [String], default: [] },
     confirmationEmailStatus: {
       type: String,

@@ -7,6 +7,8 @@ import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
 import { User } from "@/models/User";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { ProfileForm } from "@/components/account/ProfileForm";
+import { serializeCustomerProfile } from "@/modules/profile/service";
 
 export const metadata: Metadata = { title: "Your account" };
 export const dynamic = "force-dynamic";
@@ -16,7 +18,7 @@ export default async function AccountPage() {
   if (!session) redirect("/login");
   await connectToDatabase();
   const [user, orders] = await Promise.all([
-    User.findById(session.userId).select("fullName email createdAt").lean(),
+    User.findById(session.userId).lean(),
     Order.find({ userId: session.userId }).sort({ createdAt: -1 }).limit(20).populate("quoteId").lean(),
   ]);
   if (!user) redirect("/login");
@@ -28,6 +30,12 @@ export default async function AccountPage() {
           <div className="flex items-center gap-4"><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-400"><CircleUserRound size={28} /></div><div><p className="text-sm text-slate-500">Welcome back</p><h1 className="text-2xl font-black">{user.fullName}</h1><p className="mt-1 text-sm text-slate-400">{user.email}</p></div></div>
           <LogoutButton />
         </div>
+
+        {user.role === "Customer" && (
+          <ProfileForm
+            initialProfile={JSON.parse(JSON.stringify(serializeCustomerProfile(user as Record<string, unknown>)))}
+          />
+        )}
 
         <div className="mt-6 flex items-center justify-between"><div><h2 className="text-xl font-black">Your orders</h2><p className="mt-1 text-sm text-slate-500">Payment and confirmation history</p></div><Link href="/#vehicle-search" className="btn-primary !min-h-10 !px-4 !text-sm"><CarFront size={16} /> New quote</Link></div>
         <div className="mt-5 space-y-3">

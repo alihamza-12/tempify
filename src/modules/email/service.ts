@@ -49,6 +49,7 @@ export async function sendPaymentConfirmationEmail(input: {
   endAt: Date;
   amount: number;
   currency: string;
+  receiptPdf?: Buffer;
 }) {
   const resend = getResend();
   if (!resend) {
@@ -68,8 +69,14 @@ export async function sendPaymentConfirmationEmail(input: {
     subject: `Payment confirmed — ${input.registration}`,
     html: emailShell(
       "Payment confirmed",
-      `<p style="font-size:16px;line-height:1.7">Hi ${escapeHtml(input.name)},</p><p style="font-size:16px;line-height:1.7">Your payment has been verified. Below is your purchase summary.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:#f7f8fb;border-radius:12px"><tr><td style="padding:14px;color:#6b7280">Order</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.orderId)}</td></tr><tr><td style="padding:14px;color:#6b7280">Vehicle</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.registration)} · ${escapeHtml(input.vehicle)}</td></tr><tr><td style="padding:14px;color:#6b7280">Cover window</td><td style="padding:14px;text-align:right;font-weight:700">${input.startAt.toLocaleString("en-GB")} – ${input.endAt.toLocaleString("en-GB")}</td></tr><tr><td style="padding:14px;color:#6b7280">Paid</td><td style="padding:14px;text-align:right;font-weight:800;color:#ea580c">${money}</td></tr></table><p style="color:#697386;line-height:1.6">Keep this email for your records. Your username is <strong>${escapeHtml(input.email)}</strong>; use the password you created during registration. Passwords are never sent by email.</p>`,
+      `<p style="font-size:16px;line-height:1.7">Hi ${escapeHtml(input.name)},</p><p style="font-size:16px;line-height:1.7">Your payment has been verified. Below is your purchase summary.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:#f7f8fb;border-radius:12px"><tr><td style="padding:14px;color:#6b7280">Order</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.orderId)}</td></tr><tr><td style="padding:14px;color:#6b7280">Vehicle</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.registration)} · ${escapeHtml(input.vehicle)}</td></tr><tr><td style="padding:14px;color:#6b7280">Requested cover window</td><td style="padding:14px;text-align:right;font-weight:700">${input.startAt.toLocaleString("en-GB")} – ${input.endAt.toLocaleString("en-GB")}</td></tr><tr><td style="padding:14px;color:#6b7280">Paid</td><td style="padding:14px;text-align:right;font-weight:800;color:#ea580c">${money}</td></tr></table><p style="padding:14px;background:#fff4e8;border:1px solid #ffd6ad;border-radius:10px;color:#9a3412;line-height:1.6"><strong>Important:</strong> The attached document is a payment receipt only and is not proof of insurance or a certificate of motor insurance.</p><p style="color:#697386;line-height:1.6">Keep this email for your records. Your username is <strong>${escapeHtml(input.email)}</strong>; use the password you created during registration. Passwords are never sent by email.</p>`,
     ),
+    attachments: input.receiptPdf
+      ? [{
+          filename: `Tempify-payment-receipt-${input.orderId}.pdf`,
+          content: input.receiptPdf,
+        }]
+      : undefined,
   });
 
   if (result.error) throw new Error(result.error.message);

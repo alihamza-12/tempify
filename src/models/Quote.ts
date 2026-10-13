@@ -4,6 +4,7 @@ const quoteSchema = new Schema(
   {
     publicId: { type: String, required: true, unique: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: "User", default: null },
+    vehicleId: { type: Schema.Types.ObjectId, ref: "Vehicle", default: null },
     vehicle: {
       registration: { type: String, required: true },
       make: { type: String, required: true },
@@ -11,6 +12,7 @@ const quoteSchema = new Schema(
       colour: String,
       year: Number,
       fuelType: String,
+      vehicleIdentificationNumber: String,
       source: { type: String, enum: ["regcheck"], required: true },
       verifiedAt: Date,
     },
@@ -25,6 +27,7 @@ const quoteSchema = new Schema(
       firstName: { type: String, required: true },
       lastName: { type: String, required: true },
       dateOfBirth: { type: Date, required: true },
+      gender: { type: String, required: true },
       occupation: { type: String, required: true },
       phone: { type: String, required: true },
       email: { type: String, required: true, lowercase: true },
@@ -33,11 +36,13 @@ const quoteSchema = new Schema(
       line1: { type: String, required: true },
       line2: String,
       city: { type: String, required: true },
+      county: String,
       postcode: { type: String, required: true, uppercase: true },
       country: { type: String, default: "GB" },
     },
     licence: {
       number: { type: String, required: true, uppercase: true },
+      lastFourDigits: String,
       type: { type: String, required: true },
       heldFor: { type: String, required: true },
       vehicleValue: { type: String, required: true },

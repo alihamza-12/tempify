@@ -31,7 +31,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="min-h-[calc(100vh-145px)] bg-[radial-gradient(circle_at_top,rgba(255,100,8,.12),transparent_28%),#f5f6f8] px-3 py-10 sm:py-14">
-      <div className="mx-auto max-w-3xl"><ReviewClient quote={JSON.parse(JSON.stringify(serializable))} /></div>
+      <div className="mx-auto max-w-3xl"><ReviewClient quote={JSON.parse(JSON.stringify(serializable))} checkoutEnabled={process.env.LIVE_POLICY_CHECKOUT_ENABLED === "true"} /></div>
     </div>
   );
 }

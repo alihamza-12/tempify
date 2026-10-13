@@ -7,11 +7,11 @@ import { AuthModal } from "@/components/auth/AuthModal";
 
 type ReviewQuote = {
   publicId: string;
-  vehicle: { registration: string; make: string; model: string; colour?: string; year?: number };
+  vehicle: { registration: string; make: string; model: string; colour?: string; year?: number; vehicleIdentificationNumber?: string };
   cover: { durationUnit: string; durationValue: number; startAt: string; endAt: string };
-  driver: { title: string; firstName: string; lastName: string; dateOfBirth: string; occupation: string; phone: string; email: string };
-  address: { line1: string; line2?: string; city: string; postcode: string };
-  licence: { number: string; type: string; heldFor: string; vehicleValue: string; reasonForCover: string };
+  driver: { title: string; firstName: string; lastName: string; dateOfBirth: string; gender: string; occupation: string; phone: string; email: string };
+  address: { line1: string; line2?: string; city: string; county?: string; postcode: string; country?: string };
+  licence: { number: string; lastFourDigits?: string; type: string; heldFor: string; vehicleValue: string; reasonForCover: string };
   modifications: string[];
   pricing: {
     amount: number;
@@ -22,7 +22,7 @@ type ReviewQuote = {
   };
 };
 
-export function ReviewClient({ quote }: { quote: ReviewQuote }) {
+export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; checkoutEnabled: boolean }) {
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,6 +32,26 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
 
   const moneyFormatter = new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.pricing.currency });
   const money = moneyFormatter.format(quote.pricing.amount);
+  const detailsComplete = [
+    quote.driver.title,
+    quote.driver.firstName,
+    quote.driver.lastName,
+    quote.driver.dateOfBirth,
+    quote.driver.gender,
+    quote.driver.occupation,
+    quote.driver.phone,
+    quote.driver.email,
+    quote.address.line1,
+    quote.address.city,
+    quote.address.postcode,
+    quote.licence.number,
+    quote.licence.type,
+    quote.licence.heldFor,
+    quote.vehicle.registration,
+    quote.vehicle.make,
+    quote.vehicle.model,
+    quote.vehicle.vehicleIdentificationNumber,
+  ].every((value) => String(value || "").trim().length > 0);
 
   async function beginCheckout(skipSessionCheck = false) {
     setError("");
@@ -79,17 +99,23 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
           <ReviewSection icon={UserRound} title="Customer details">
             <ReviewRow label="Name" value={`${quote.driver.title} ${quote.driver.firstName} ${quote.driver.lastName}`} />
             <ReviewRow label="Date of birth" value={new Date(quote.driver.dateOfBirth).toLocaleDateString("en-GB")} />
-            <ReviewRow label="Address" value={[quote.address.line1, quote.address.line2, quote.address.city, quote.address.postcode].filter(Boolean).join(", ")} />
+            <ReviewRow label="Gender" value={quote.driver.gender} />
+            <ReviewRow label="Address" value={[quote.address.line1, quote.address.line2, quote.address.city, quote.address.county, quote.address.postcode, quote.address.country || "GB"].filter(Boolean).join(", ")} />
             <ReviewRow label="Occupation" value={quote.driver.occupation} />
+            <ReviewRow label="Mobile" value={quote.driver.phone} />
             <ReviewRow label="Email" value={quote.driver.email} />
           </ReviewSection>
 
           <ReviewSection icon={CreditCard} title="Vehicle & cover">
             <ReviewRow label="Vehicle" value={`${quote.vehicle.registration} · ${quote.vehicle.make} ${quote.vehicle.model}`} />
+            {quote.vehicle.vehicleIdentificationNumber && <ReviewRow label="VIN" value={quote.vehicle.vehicleIdentificationNumber} />}
             <ReviewRow label="Start" value={new Date(quote.cover.startAt).toLocaleString("en-GB")} />
             <ReviewRow label="End" value={new Date(quote.cover.endAt).toLocaleString("en-GB")} />
-            <ReviewRow label="Licence" value={`${quote.licence.type} · held ${quote.licence.heldFor.toLowerCase()}`} />
+            <ReviewRow label="Driving licence" value={quote.licence.number} />
+            <ReviewRow label="Licence type" value={`${quote.licence.type} · held ${quote.licence.heldFor.toLowerCase()}`} />
+            <ReviewRow label="Vehicle value" value={quote.licence.vehicleValue} />
             <ReviewRow label="Reason" value={quote.licence.reasonForCover} />
+            {quote.licence.lastFourDigits && <ReviewRow label="Saved payment card" value={`Ending ${quote.licence.lastFourDigits}`} />}
           </ReviewSection>
 
           <div className="overflow-hidden rounded-2xl border border-orange-400/20 bg-gradient-to-br from-[#ef5a08] to-[#c93808] p-5 sm:p-6">
@@ -110,10 +136,12 @@ export function ReviewClient({ quote }: { quote: ReviewQuote }) {
 
         </div>
 
+        {!detailsComplete && <div className="error-box mt-5">Complete all required customer, licence and verified vehicle details before payment can be started.</div>}
+        {detailsComplete && !checkoutEnabled && <div className="error-box mt-5">Your details are complete, but live checkout is disabled until written issuance authority and the approved insurer fulfilment module are in place.</div>}
         {error && <div className="error-box mt-5">{error}</div>}
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button type="button" onClick={() => router.back()} className="btn-secondary"><ArrowLeft size={17} /> Change details</button>
-          <button type="button" onClick={() => beginCheckout()} disabled={loading} className="btn-primary">{loading ? <><LoaderCircle size={18} className="animate-spin" /> Preparing checkout</> : <><CreditCard size={17} /> Proceed to payment</>}</button>
+          <button type="button" onClick={() => beginCheckout()} disabled={loading || !detailsComplete || !checkoutEnabled} className="btn-primary">{loading ? <><LoaderCircle size={18} className="animate-spin" /> Preparing checkout</> : <><CreditCard size={17} /> Proceed to payment</>}</button>
         </div>
       </div>
 

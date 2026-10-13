@@ -3,6 +3,7 @@ import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
 import { sendPaymentConfirmationEmail } from "@/modules/email/service";
+import { generatePaymentReceipt } from "@/modules/documents/paymentReceipt";
 
 export async function markOrderPaid(input: {
   externalId: string;
@@ -32,6 +33,7 @@ export async function markOrderPaid(input: {
     order.transactionUUID = input.transactionUUID;
     order.transactionRef = input.transactionRef || undefined;
     order.paidAt = input.paidAt ? new Date(input.paidAt) : new Date();
+    order.fulfillmentStatus = "blocked_pending_authority";
     await order.save();
 
     const quote = await Quote.findByIdAndUpdate(order.quoteId, { status: "paid", userId: order.userId }, { new: true });
@@ -68,6 +70,20 @@ async function sendConfirmationOnce(orderId: string) {
   try {
     const quote = await Quote.findById(claimed.quoteId).lean();
     if (!quote) throw new Error("Quote not found for confirmation email.");
+    const customerName = `${quote.driver.firstName} ${quote.driver.lastName}`.trim();
+    const receiptPdf = await generatePaymentReceipt({
+      orderId: claimed.publicId,
+      transactionReference: claimed.transactionRef,
+      customerName,
+      customerEmail: claimed.customerEmail,
+      registration: quote.vehicle.registration,
+      vehicle: `${quote.vehicle.make} ${quote.vehicle.model}`,
+      startAt: new Date(quote.cover.startAt),
+      endAt: new Date(quote.cover.endAt),
+      amount: claimed.amount,
+      currency: claimed.currency,
+      paidAt: claimed.paidAt ? new Date(claimed.paidAt) : new Date(),
+    });
     const result = await sendPaymentConfirmationEmail({
       email: claimed.customerEmail,
       name: quote.driver.firstName,
@@ -78,6 +94,7 @@ async function sendConfirmationOnce(orderId: string) {
       endAt: new Date(quote.cover.endAt),
       amount: claimed.amount,
       currency: claimed.currency,
+      receiptPdf,
     });
     await Order.updateOne(
       { _id: claimed._id },

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const valid = eventType === "order.paid" && verifyPayMeGateWebhook({ rawBody, signature, timestamp });
   if (!valid) {
     console.warn("[paymegate:webhook] rejected signature or event type");
-    return NextResponse.json({ received: false });
+    return NextResponse.json({ received: false }, { status: 401 });
   }
 
   try {
