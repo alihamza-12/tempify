@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { apiError } from "@/lib/http";
 import { rateLimit } from "@/lib/rate-limit";
 import { contactMessageSchema } from "@/modules/contact/schema";
-import { sendContactSupportEmail } from "@/modules/email/service";
+import { sendContactMessageEmails } from "@/modules/email/service";
 
 export const runtime = "nodejs";
 
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    await sendContactSupportEmail(input);
+    await sendContactMessageEmails(input);
     return NextResponse.json({
       success: true,
       message: "Thanks — your message has been sent. We aim to respond within 24 hours.",

@@ -83,13 +83,53 @@ export async function sendPaymentConfirmationEmail(input: {
   return result.data;
 }
 
-export async function sendContactSupportEmail(input: {
+type ContactEmailInput = {
   firstName: string;
   lastName: string;
   email: string;
   subject: string;
   message: string;
-}) {
+};
+
+/**
+ * Build both sides of the contact exchange. The support copy keeps the
+ * customer's address as Reply-To, while the customer receives an explicit
+ * acknowledgement that does not expose the private support destination.
+ */
+export function buildContactEmailBatch(input: ContactEmailInput) {
+  const from = process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>";
+  const supportTo = process.env.CONTACT_TO_EMAIL || "support@cuvvapolicies.com";
+  const cleanSubject = input.subject.replace(/[\r\n]+/g, " ").trim();
+  const safeSubject = escapeHtml(cleanSubject);
+  const safeFirstName = escapeHtml(input.firstName);
+  const safeFullName = `${safeFirstName} ${escapeHtml(input.lastName)}`;
+  const safeEmail = escapeHtml(input.email);
+  const safeMessage = escapeHtml(input.message).replace(/\r?\n/g, "<br>");
+
+  return [
+    {
+      from,
+      to: [supportTo],
+      replyTo: input.email,
+      subject: `[Tempify support] ${cleanSubject}`,
+      html: emailShell(
+        "New support request",
+        `<p style="font-size:16px;line-height:1.7"><strong>From:</strong> ${safeFullName} (${safeEmail})</p><p style="font-size:16px;line-height:1.7"><strong>Subject:</strong> ${safeSubject}</p><div style="margin-top:22px;padding:18px;background:#f7f8fb;border-radius:12px;font-size:15px;line-height:1.7">${safeMessage}</div>`,
+      ),
+    },
+    {
+      from,
+      to: [input.email],
+      subject: "We received your Tempify message",
+      html: emailShell(
+        "We received your message",
+        `<p style="font-size:16px;line-height:1.7">Hi ${safeFirstName},</p><p style="font-size:16px;line-height:1.7">Thanks for contacting Tempify. We received your message about <strong>${safeSubject}</strong> and aim to respond within 24 hours.</p><p style="color:#697386;line-height:1.6">This acknowledgement confirms receipt of your enquiry only. It does not create a payment, insurance policy or insurance cover.</p>`,
+      ),
+    },
+  ];
+}
+
+export async function sendContactMessageEmails(input: ContactEmailInput) {
   const resend = getResend();
   const deliveryMode = process.env.EMAIL_DELIVERY_MODE || "resend";
   const cleanSubject = input.subject.replace(/[\r\n]+/g, " ").trim();
@@ -98,25 +138,14 @@ export async function sendContactSupportEmail(input: {
     if (process.env.NODE_ENV === "production" && deliveryMode !== "console") {
       throw new Error("RESEND_API_KEY is not configured.");
     }
-    console.info("[email:development] Contact message", {
+    console.info("[email:development] Contact message and customer acknowledgement", {
       from: input.email,
       subject: cleanSubject,
     });
     return { id: "development-console" };
   }
 
-  const safeMessage = escapeHtml(input.message).replace(/\r?\n/g, "<br>");
-  const result = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>",
-    to: process.env.CONTACT_TO_EMAIL || "support@cuvvapolicies.com",
-    replyTo: input.email,
-    subject: `[Tempify support] ${cleanSubject}`,
-    html: emailShell(
-      "New support request",
-      `<p style="font-size:16px;line-height:1.7"><strong>From:</strong> ${escapeHtml(input.firstName)} ${escapeHtml(input.lastName)} (${escapeHtml(input.email)})</p><p style="font-size:16px;line-height:1.7"><strong>Subject:</strong> ${escapeHtml(cleanSubject)}</p><div style="margin-top:22px;padding:18px;background:#f7f8fb;border-radius:12px;font-size:15px;line-height:1.7">${safeMessage}</div>`,
-    ),
-  });
-
+  const result = await resend.batch.send(buildContactEmailBatch(input));
   if (result.error) throw new Error(result.error.message);
   return result.data;
 }
