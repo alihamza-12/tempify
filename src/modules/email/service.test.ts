@@ -1,18 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { batchSend } = vi.hoisted(() => ({
+const { batchSend, emailSend } = vi.hoisted(() => ({
   batchSend: vi.fn(),
+  emailSend: vi.fn(),
 }));
 
 vi.mock("resend", () => ({
   Resend: class {
     batch = { send: batchSend };
+    emails = { send: emailSend };
   },
 }));
 
 import {
   buildContactEmailBatch,
   sendContactMessageEmails,
+  sendPaymentConfirmationEmail,
 } from "./service";
 
 const input = {
@@ -29,13 +32,16 @@ describe("contact email delivery", () => {
     process.env.EMAIL_DELIVERY_MODE = "resend";
     process.env.EMAIL_FROM = "Tempify <auto@cuvvapolicies.com>";
     process.env.CONTACT_TO_EMAIL = "support@example.com";
+    delete process.env.PAYMENT_EMAIL_FROM;
     batchSend.mockReset();
+    emailSend.mockReset();
   });
 
   afterEach(() => {
     delete process.env.RESEND_API_KEY;
     delete process.env.EMAIL_DELIVERY_MODE;
     delete process.env.EMAIL_FROM;
+    delete process.env.PAYMENT_EMAIL_FROM;
     delete process.env.CONTACT_TO_EMAIL;
   });
 
@@ -85,5 +91,33 @@ describe("contact email delivery", () => {
     });
 
     await expect(sendContactMessageEmails(input)).rejects.toThrow("Batch rejected");
+  });
+
+  it("uses the exact existing Cuvva sender for post-payment email only", async () => {
+    emailSend.mockResolvedValue({ data: { id: "payment-id" }, error: null });
+
+    await sendPaymentConfirmationEmail({
+      email: "ava@example.com",
+      name: "Ava O'Neil",
+      orderId: "TMP-123",
+      registration: "AB12CDE",
+      vehicle: "Example Car",
+      startAt: new Date("2026-10-15T10:00:00.000Z"),
+      endAt: new Date("2026-10-15T12:00:00.000Z"),
+      amount: 25,
+      currency: "GBP",
+    });
+
+    expect(emailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "Cuvva <auto@cuvvapolicies.com>",
+        to: "ava@example.com",
+        subject: "Payment confirmed — AB12CDE",
+      }),
+    );
+
+    const contactEmails = buildContactEmailBatch(input);
+    expect(contactEmails[0].from).toBe("Tempify <auto@cuvvapolicies.com>");
+    expect(contactEmails[1].from).toBe("Tempify <auto@cuvvapolicies.com>");
   });
 });

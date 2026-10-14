@@ -64,7 +64,9 @@ export async function sendPaymentConfirmationEmail(input: {
   }).format(input.amount);
 
   const result = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>",
+    // Match the existing Cuvva payment sender exactly. Other Tempify messages
+    // continue to use EMAIL_FROM and retain their Tempify display name.
+    from: process.env.PAYMENT_EMAIL_FROM || "Cuvva <auto@cuvvapolicies.com>",
     to: input.email,
     subject: `Payment confirmed — ${input.registration}`,
     html: emailShell(
