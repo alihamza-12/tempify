@@ -1,4 +1,7 @@
 import { Resend } from "resend";
+import { buildSamplePolicyBundle } from "@/modules/policy-documents/sample";
+import { policyDocumentSchema } from "@/modules/policy-documents/schema";
+import { gbpPence } from "@/modules/payments/validation";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
@@ -39,49 +42,50 @@ export async function sendVerificationEmail(input: {
   return result.data;
 }
 
-export async function sendPaymentConfirmationEmail(input: {
-  email: string;
-  name: string;
-  orderId: string;
-  registration: string;
-  vehicle: string;
-  startAt: Date;
-  endAt: Date;
-  amount: number;
-  currency: string;
-  receiptPdf?: Buffer;
-}) {
-  const resend = getResend();
-  if (!resend) {
-    if (process.env.NODE_ENV === "production") throw new Error("RESEND_API_KEY is not configured.");
-    console.info(`[email:development] Confirmation for ${input.orderId} to ${input.email}`);
-    return { id: "development-console" };
+export type PreparedPaymentEmail = {
+  from: string;
+  to: string;
+  subject: string;
+  html: string;
+  attachments: { filename: string; content: string; contentType: string; contentId?: string }[];
+};
+
+export async function preparePaymentDocumentEmail(input: {
+  orderId: string; email: string; amount: number; currency: string; documentSnapshot: unknown;
+}): Promise<PreparedPaymentEmail> {
+  const document = policyDocumentSchema.parse(input.documentSnapshot);
+  if (document.policy._id !== input.orderId ||
+      document.customer.email.toLowerCase() !== input.email.toLowerCase() ||
+      input.currency !== "GBP" || gbpPence(input.amount) === null ||
+      gbpPence(document.policy.premiumAmount) !== gbpPence(input.amount)) {
+    throw new Error("Document snapshot does not match the verified order.");
   }
+  const bundle = await buildSamplePolicyBundle(document, true);
+  const from = process.env.PAYMENT_EMAIL_FROM || "Cuvva <auto@cuvvapolicies.com>";
+  if (/[\r\n]/.test(from)) throw new Error("Invalid payment email sender.");
+  return {
+    from, to: bundle.to, subject: bundle.subject, html: bundle.html,
+    attachments: bundle.attachments.map((attachment) => ({
+      filename: attachment.filename, content: attachment.content.toString("base64"),
+      contentType: attachment.contentType,
+      ...(attachment.cid ? { contentId: attachment.cid } : {}),
+    })),
+  };
+}
 
-  const money = new Intl.NumberFormat("en-GB", {
-    style: "currency",
-    currency: input.currency,
-  }).format(input.amount);
-
-  const result = await resend.emails.send({
-    // Match the existing Cuvva payment sender exactly. Other Tempify messages
-    // continue to use EMAIL_FROM and retain their Tempify display name.
-    from: process.env.PAYMENT_EMAIL_FROM || "Cuvva <auto@cuvvapolicies.com>",
-    to: input.email,
-    subject: `Payment confirmed — ${input.registration}`,
-    html: emailShell(
-      "Payment confirmed",
-      `<p style="font-size:16px;line-height:1.7">Hi ${escapeHtml(input.name)},</p><p style="font-size:16px;line-height:1.7">Your payment has been verified. Below is your purchase summary.</p><table width="100%" cellpadding="0" cellspacing="0" style="margin:22px 0;background:#f7f8fb;border-radius:12px"><tr><td style="padding:14px;color:#6b7280">Order</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.orderId)}</td></tr><tr><td style="padding:14px;color:#6b7280">Vehicle</td><td style="padding:14px;text-align:right;font-weight:700">${escapeHtml(input.registration)} · ${escapeHtml(input.vehicle)}</td></tr><tr><td style="padding:14px;color:#6b7280">Requested cover window</td><td style="padding:14px;text-align:right;font-weight:700">${input.startAt.toLocaleString("en-GB")} – ${input.endAt.toLocaleString("en-GB")}</td></tr><tr><td style="padding:14px;color:#6b7280">Paid</td><td style="padding:14px;text-align:right;font-weight:800;color:#ea580c">${money}</td></tr></table><p style="padding:14px;background:#fff4e8;border:1px solid #ffd6ad;border-radius:10px;color:#9a3412;line-height:1.6"><strong>Important:</strong> The attached document is a payment receipt only and is not proof of insurance or a certificate of motor insurance.</p><p style="color:#697386;line-height:1.6">Keep this email for your records. Your username is <strong>${escapeHtml(input.email)}</strong>; use the password you created during registration. Passwords are never sent by email.</p>`,
-    ),
-    attachments: input.receiptPdf
-      ? [{
-          filename: `Tempify-payment-receipt-${input.orderId}.pdf`,
-          content: input.receiptPdf,
-        }]
-      : undefined,
+/** Called only by verified-paid order fulfillment, with a persisted exact payload. */
+export async function sendPaymentConfirmationEmail(input: { orderId: string; payload: PreparedPaymentEmail }) {
+  const resend = getResend();
+  if (!resend) throw new Error("RESEND_API_KEY is not configured.");
+  if ((process.env.EMAIL_DELIVERY_MODE || "resend") !== "resend") {
+    throw new Error("Email delivery is disabled by EMAIL_DELIVERY_MODE.");
+  }
+  const result = await resend.emails.send(input.payload, {
+    idempotencyKey: `tempify-payment-documents/${input.orderId}/v1`,
+    signal: AbortSignal.timeout(20_000),
   });
-
-  if (result.error) throw new Error(result.error.message);
+  if (result.error) throw new Error("Payment document email was rejected by the email provider.");
+  if (!result.data?.id) throw new Error("Email provider did not confirm acceptance.");
   return result.data;
 }
 

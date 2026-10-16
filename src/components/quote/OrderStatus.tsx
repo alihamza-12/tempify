@@ -12,6 +12,8 @@ type OrderState = {
   paidAt: string | null;
   policyIssued: boolean;
   fulfillmentStatus: string;
+  confirmationEmailRetryable: boolean;
+  confirmationEmailStatus: "pending" | "sending" | "sent" | "failed";
 };
 
 export function OrderStatus({ id, email }: { id: string; email: string }) {
@@ -28,7 +30,10 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
         if (!response.ok) throw new Error(data.error || "Unable to load payment status.");
         if (!active) return;
         setOrder(data);
-        if (!["paid", "failed", "cancelled", "expired"].includes(data.status)) timer = setTimeout(check, 3000);
+        if (
+          !["paid", "failed", "cancelled", "expired"].includes(data.status) ||
+          (data.status === "paid" && data.confirmationEmailRetryable)
+        ) timer = setTimeout(check, 3000);
       } catch (checkError) {
         if (active) setError(checkError instanceof Error ? checkError.message : "Unable to load payment status.");
       }
@@ -41,17 +46,26 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
   if (!order || order.status === "unpaid") return <StateCard icon={LoaderCircle} spinning title="Confirming your payment" text="Please keep this page open. We’re securely checking the payment provider for confirmation." tone="waiting" />;
   if (order.status !== "paid") return <StateCard icon={TriangleAlert} title={`Payment ${order.status}`} text="No fulfillment has been issued. You can return to your account or contact support if you think this is incorrect." tone="error" />;
 
+  const emailSent = order.confirmationEmailStatus === "sent";
+  const emailFailed = !emailSent && !order.confirmationEmailRetryable;
+  const emailSummary = emailSent ? "Documents submitted" : emailFailed ? "Delivery needs attention" : "Documents pending";
+  const emailMessage = emailSent
+    ? `Your email and three sample PDFs were submitted to the email provider for ${email}. Please check your inbox and spam folder.`
+    : emailFailed
+      ? "Your payment is confirmed, but we could not send your documents. Please contact support; do not pay again."
+      : "Your payment is confirmed. Your document email is still being processed.";
+
   const money = new Intl.NumberFormat("en-GB", { style: "currency", currency: order.currency }).format(order.amount);
   return (
     <div className="panel overflow-hidden rounded-[28px]">
       <div className="brand-gradient px-6 py-10 text-center">
         <CheckCircle2 size={52} className="mx-auto" />
         <h1 className="mt-4 text-3xl font-black">Payment received</h1>
-        <p className="mt-2 text-white/80">Your payment receipt has been sent to {email}</p>
+        <p className="mt-2 text-white/80">{emailMessage}</p>
       </div>
       <div className="space-y-5 p-5 sm:p-8">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Summary icon={MailCheck} label="Email" value="Receipt sent" />
+          <Summary icon={MailCheck} label="Email" value={emailSummary} />
           <Summary icon={UserRound} label="Username" value={email} />
           <Summary icon={Clock3} label="Amount paid" value={money} />
         </div>
@@ -59,7 +73,7 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
         {!order.policyIssued && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-100">
             <strong className="block text-base text-red-300">No insurance policy or certificate has been issued</strong>
-            The email attachment is a payment receipt only and is not proof of insurance. Do not drive in reliance on this payment confirmation.
+            All three PDF attachments are marked SAMPLE — NOT VALID INSURANCE — NO POLICY ISSUED. They are not proof of insurance. Do not drive in reliance on this payment confirmation.
           </div>
         )}
 

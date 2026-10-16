@@ -123,7 +123,7 @@ The quote page loads an authenticated customer's shared profile and keeps every 
 
 The server checks the complete customer, licence, verified vehicle and VIN data again before creating a PayMeGate order. Client-side form completion alone cannot bypass this check.
 
-Because written Cuvva/Wakam issuance authority was not confirmed, `LIVE_POLICY_CHECKOUT_ENABLED` defaults to `false`. This build does not create a Cuvva policy or legal certificate. If an already-existing/test order is reconciled as paid, the email attachment is a clearly marked payment receipt that is **not proof of insurance**, and the order remains `blocked_pending_authority`. Do not enable live collection until the approved insurer/underwriter supplies written authority and a separately reviewed fulfilment module has been implemented.
+Because written Cuvva/Wakam issuance authority was not confirmed, `LIVE_POLICY_CHECKOUT_ENABLED` defaults to `false`. This build does not create a Cuvva policy or legal certificate. A verified paid order now automatically receives the Cuvva-template email with one dynamically filled sample PDF and the two original template PDFs. All three attachments have a small SAMPLE - NOT VALID INSURANCE - NO POLICY ISSUED footer; the email also identifies them as samples. The order remains `blocked_pending_authority`, with no insurance policy created. Do not enable live collection until the approved insurer/underwriter supplies written authority and a separately reviewed fulfilment module has been implemented.
 
 ## PayMeGate activation
 
@@ -144,7 +144,7 @@ https://YOUR-DOMAIN/api/webhooks/paymegate
 8. Save the one-time signing secret immediately as `PAYMEGATE_WEBHOOK_SECRET`.
 9. Set `NEXT_PUBLIC_APP_URL=https://YOUR-DOMAIN`.
 10. Confirm supported currency and active methods using the merchant dashboard/API.
-11. Only after authority and fulfilment approval, test with a controlled order and verify webhook, reconciliation, receipt email and wallet settlement.
+11. Only after authority and fulfilment approval, test with a controlled order and verify webhook, reconciliation, sample-document email and wallet settlement.
 
 The browser receives only PayMeGate's hosted `checkoutUrl`. API keys and payment-provider details never reach client JavaScript. Apple Pay, Google Pay, card, and other methods are eligibility-dependent and are displayed by PayMeGate's hosted checkout.
 
@@ -159,7 +159,7 @@ CONTACT_TO_EMAIL=support@cuvvapolicies.com
 EMAIL_DELIVERY_MODE=resend
 ```
 
-OTP emails are sent during registration. A payment confirmation email and attached PDF payment receipt are sent only after a signed PayMeGate webhook or direct server reconciliation confirms `PAID`. The receipt is explicitly marked as not proof of insurance. No Cuvva/Wakam policy certificate or policy-wording attachments are generated while issuance authority remains unconfirmed. The contact form sends validated, rate-limited messages to `CONTACT_TO_EMAIL` with the customer address set as the reply-to address.
+OTP emails are sent during registration. A Cuvva-template payment email and three sample-labelled PDFs are sent after a signed PayMeGate webhook or direct server reconciliation confirms a matching `PAID` order. This is connected directly to paid-order fulfillment, with no additional policy-email enable variable. It creates no insurance cover. See `docs/REPLACE_FILES_GUIDE.md` for installation, required existing email credentials and retry behavior. The contact form sends validated, rate-limited messages to `CONTACT_TO_EMAIL` with the customer address set as the reply-to address.
 
 ## Quality checks
 
@@ -233,7 +233,8 @@ src/modules/contact      Contact-form validation
 src/modules/vehicles     Shared verified lookup and provider adapter
 src/modules/quotes       Validation and pricing
 src/modules/payments     PayMeGate client, HMAC, fulfillment
-src/modules/documents    Payment receipt generation (not proof of insurance)
+src/modules/documents    Legacy receipt renderer (retained for compatibility)
+src/modules/policy-documents Original Cuvva renderer, quote snapshots and mandatory sample labels
 src/modules/email        Resend templates and delivery
 src/lib                  Database, sessions, HTTP helpers, rate limiting
 ```
@@ -246,3 +247,7 @@ src/lib                  Database, sessions, HTTP helpers, rate limiting
 - Replace the in-memory general rate limiter with a durable service such as Vercel KV/Upstash.
 - Configure monitoring and alerts for failed webhook processing and email delivery.
 - Run a security review and end-to-end live payment test.
+
+## Final payment audit (15 October 2026)
+
+See [PAYMENT_FINAL_AUDIT.md](docs/PAYMENT_FINAL_AUDIT.md) for the additional checkout/payment-verification fixes, 88 passing automated tests, new isolated MongoDB integration suite, and the still-pending live-payment/inbox/wallet checks. Run `npm run test:payment:integration` separately from `npm test`. The existing checkout gate and sample labels remain unchanged.

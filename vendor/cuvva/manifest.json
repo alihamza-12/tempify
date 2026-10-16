@@ -1,0 +1,24 @@
+{
+  "repository": "https://github.com/alihamza-12/cuvva-backend",
+  "commit": "fe51b0979ca8b94d3552792305e57955bf9dd5f0",
+  "files": {
+    "utils/sendEmail.js": "0337aa03743fd79e5ef17fc01404fd99c898b5ebdfc41351642458bef8bb85b4",
+    "services/pdf/generatePolicyCertificate.js": "de82b74eaaaf5720ac73e372f2b21b95bc06557270d9737f77de00ccd88c035c",
+    "public/email-assets/cuvva-logo.png": "b8a58bfd222666e4ebfa1f8107d8096082c762352f24b6deba886ecb919f6a31",
+    "public/email-assets/icon-mastercard.png": "61a25962a196eb5c9fae53f0813107b021ce17b44846bae22d885df03a145ca5",
+    "public/email-assets/icon-x.png": "12870e3ef3c6935886f6ff116ac66c6792f398f4408932f1e4cf909a976d0dae",
+    "public/email-assets/app-store-badge.png": "200144ff37561449ee4e303431779ef6268048d0e5ada15da2794ba14ff84a8f",
+    "public/email-assets/icon-linkedin.png": "79807acfe4a9c7a39426aef3a46db02eeb4af0378eecfc2052236d564989236e",
+    "public/email-assets/icon-instagram.png": "d5b3cc36c2b11327d2d2d48039c0e389883f6b8ace2ebd6e4170d60ac9b1ffee",
+    "public/email-assets/icon-youtube.png": "c87109d1d98d7f6f0f2ecaed0dc6299deecc199a569d6fd151ebffe88eade137",
+    "public/email-assets/google-play-badge.png": "f72611e2df8e88204009fd896d05d5e8e83c77009c63943bbffa169559934849",
+    "public/email-assets/icon-facebook.png": "6ca5ba9605103e39902252a99d1dba9bd3b1bed070b4015e1a4df5330126b07d",
+    "public/email-assets/icon-tiktok.png": "66080f065e0fcd3815fc8d1a923a97af65c991881940e32735d8d98eeb208d4f",
+    "public/pdf-assets/OpenSans-Regular.woff": "8b3c81a3240d7c8cc9877cf5233d97051aa07730947217db840e500470a4d44a",
+    "public/pdf-assets/OpenSans-Italic.woff": "fa8383f26e60a89f4eb956d2997b416d22023427100151438b42372718ca8231",
+    "public/pdf-assets/OpenSans-Bold.woff": "397ccaf840827f6c84ebadf664b6494338d4ea39440ab22811829868014c43f5",
+    "public/pdf-assets/wakam-signature.jpg": "3362b94302214ffae10aed1588c028b8be6177bd9bf30a086e61f97b3fd5947f",
+    "pdfs/Insurance summary (IPID).pdf": "f1f7c347a8fc9e2b43f79f6641f6d50df9b83ea4ffeb75c52874853dc0dadc07",
+    "pdfs/Policy wording (full terms).pdf": "c6eeaca03f544cc70078e16bdd7eb722a56affa0cbf77fa84e80a0de761c61ef"
+  }
+}

@@ -16,6 +16,7 @@ const orderSchema = new Schema(
     },
     paymegateOrderUUID: String,
     checkoutUrl: String,
+    checkoutCreationStatus: { type: String, enum: ["creating", "ready", "review_required"], default: "creating" },
     transactionUUID: String,
     transactionRef: String,
     paidAt: Date,
@@ -31,6 +32,15 @@ const orderSchema = new Schema(
       enum: ["pending", "sending", "sent", "failed"],
       default: "pending",
     },
+    // Server-generated snapshot survives the quote collection's TTL expiry.
+    documentSnapshot: { type: Schema.Types.Mixed, default: null },
+    // Cache exact body/attachment bytes so retries use an identical provider payload.
+    confirmationEmailPayload: { type: Schema.Types.Mixed, default: null, select: false },
+    confirmationEmailClaim: String,
+    confirmationEmailClaimedAt: Date,
+    confirmationEmailFirstAttemptAt: Date,
+    confirmationEmailNextRetryAt: Date,
+    confirmationEmailAttempts: { type: Number, default: 0 },
     confirmationEmailId: String,
     confirmationEmailError: String,
   },

@@ -12,10 +12,13 @@ vi.mock("resend", () => ({
   },
 }));
 
+import { samplePolicy } from "@/modules/policy-documents/fixture";
+
 import {
   buildContactEmailBatch,
   sendContactMessageEmails,
   sendPaymentConfirmationEmail,
+  preparePaymentDocumentEmail,
 } from "./service";
 
 const input = {
@@ -96,25 +99,19 @@ describe("contact email delivery", () => {
   it("uses the exact existing Cuvva sender for post-payment email only", async () => {
     emailSend.mockResolvedValue({ data: { id: "payment-id" }, error: null });
 
-    await sendPaymentConfirmationEmail({
-      email: "ava@example.com",
-      name: "Ava O'Neil",
-      orderId: "TMP-123",
-      registration: "AB12CDE",
-      vehicle: "Example Car",
-      startAt: new Date("2026-10-15T10:00:00.000Z"),
-      endAt: new Date("2026-10-15T12:00:00.000Z"),
-      amount: 25,
-      currency: "GBP",
+    const payload = await preparePaymentDocumentEmail({
+      orderId: samplePolicy.policy._id, email: samplePolicy.customer.email,
+      amount: samplePolicy.policy.premiumAmount, currency: "GBP", documentSnapshot: samplePolicy,
     });
+    await sendPaymentConfirmationEmail({ orderId: samplePolicy.policy._id, payload });
 
     expect(emailSend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        from: "Cuvva <auto@cuvvapolicies.com>",
-        to: "ava@example.com",
-        subject: "Payment confirmed — AB12CDE",
-      }),
+      expect.objectContaining({ from: "Cuvva <auto@cuvvapolicies.com>", to: samplePolicy.customer.email }),
+      expect.objectContaining({ idempotencyKey: `tempify-payment-documents/${samplePolicy.policy._id}/v1` }),
     );
+    expect(payload.attachments.filter((attachment) => attachment.contentType === "application/pdf")).toHaveLength(3);
+    expect(payload.subject).toContain("SAMPLE");
+    expect(payload.html).toContain("No insurance policy or cover has been issued");
 
     const contactEmails = buildContactEmailBatch(input);
     expect(contactEmails[0].from).toBe("Tempify <auto@cuvvapolicies.com>");

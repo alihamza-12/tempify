@@ -8,6 +8,7 @@ export function verifyPayMeGateWebhook(input: {
   const secret = process.env.PAYMEGATE_WEBHOOK_SECRET;
   if (!secret || !input.signature || !input.timestamp) return false;
 
+  if (!/^\d+$/.test(input.timestamp)) return false;
   const timestamp = Number(input.timestamp);
   if (!Number.isFinite(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300) return false;
 

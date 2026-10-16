@@ -3,7 +3,9 @@ import { connectToDatabase } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
 import { getPayMeGateOrder, mapPaymentStatus } from "@/modules/payments/paymegate";
-import { markOrderPaid } from "@/modules/payments/fulfillment";
+import { matchesStoredPayment } from "@/modules/payments/validation";
+import { canRetryPaymentEmail } from "@/modules/payments/email-retry";
+import { markOrderPaid, sendPaidOrderEmail } from "@/modules/payments/fulfillment";
 
 export const runtime = "nodejs";
 
@@ -16,14 +18,19 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const order = await Order.findOne({ publicId: id, userId: session.userId }).lean();
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  let status = order.status;
-  if (status === "unpaid" && order.paymegateOrderUUID && process.env.PAYMEGATE_API_KEY) {
+  if (order.status === "unpaid" && order.paymegateOrderUUID && process.env.PAYMEGATE_API_KEY) {
     try {
       const remote = await getPayMeGateOrder(order.paymegateOrderUUID);
-      status = mapPaymentStatus(remote.status) as typeof status;
+      if (!matchesStoredPayment(order, remote)) {
+        throw new Error("Provider response does not match the stored order.");
+      }
+      const status = mapPaymentStatus(remote.status);
+      if (status === "paid" && remote.forced === true) {
+        throw new Error("A manually forced status is not a verified payment.");
+      }
       if (status === "paid") {
         await markOrderPaid({
-          externalId: order.publicId,
+          externalId: remote.externalId,
           eventId: `reconcile:${remote.orderUUID}`,
           orderUUID: remote.orderUUID,
           transactionUUID: remote.paidTransactionUUID,
@@ -33,21 +40,33 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
           currency: remote.currency,
         });
       } else if (status !== order.status) {
-        await Order.updateOne({ _id: order._id }, { $set: { status } });
+        await Order.updateOne({ _id: order._id, status: "unpaid" }, { $set: { status } });
       }
     } catch (error) {
       console.warn("[payment:status] remote reconciliation unavailable", error);
     }
   }
 
+  if (order.status === "paid" && canRetryPaymentEmail(order)) {
+    try { await sendPaidOrderEmail(String(order._id)); }
+    catch { console.warn("[payment:email] retry unavailable", order.publicId); }
+  }
+
+  // Re-read persisted state: a provider response alone is not proof that our
+  // validation accepted payment. This also includes changes from a concurrent webhook.
+  const latest = await Order.findOne({ publicId: id, userId: session.userId }).lean();
+  if (!latest) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+
   return NextResponse.json({
-    orderId: order.publicId,
-    status,
-    amount: order.amount,
-    currency: order.currency,
-    paidAt: order.paidAt || null,
-    policyIssued: Boolean(order.policyId),
+    orderId: latest.publicId,
+    status: latest.status,
+    amount: latest.amount,
+    currency: latest.currency,
+    paidAt: latest.paidAt || null,
+    policyIssued: latest.fulfillmentStatus === "issued" && Boolean(latest.policyId),
     fulfillmentStatus:
-      order.fulfillmentStatus || (status === "paid" ? "blocked_pending_authority" : "pending_payment"),
-  });
+      latest.fulfillmentStatus || (latest.status === "paid" ? "blocked_pending_authority" : "pending_payment"),
+    confirmationEmailStatus: latest.confirmationEmailStatus || "pending",
+    confirmationEmailRetryable: canRetryPaymentEmail(latest),
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
