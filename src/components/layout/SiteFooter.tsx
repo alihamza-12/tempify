@@ -6,7 +6,7 @@ export function SiteFooter() {
     <footer className="border-t border-white/8 bg-[#050712] py-8">
       <div className="container-shell flex flex-col items-center justify-between gap-6 sm:flex-row">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/brand/tempify-mark.png" width={24} height={24} alt="" />
+          <Image src="/brand/cuvvafy-mark.png" width={24} height={24} alt="" />
           <span className="brand-text font-black">CUVVAFY</span>
         </Link>
         <div className="flex flex-wrap justify-center gap-5 text-xs text-slate-500">
