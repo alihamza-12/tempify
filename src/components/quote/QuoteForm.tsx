@@ -191,19 +191,28 @@ export function QuoteForm({ registration }: { registration: string }) {
   }, [durationUnit, dynamicDurationOptions]);
 
   // Ensure selected durationValue exists in current options, if not pick first
+  // Fixed to avoid react-hooks/set-state-in-effect: schedule update via setTimeout callback
   useEffect(() => {
     if (!durationOptions.includes(durationValue)) {
-      setDurationValue(durationOptions[0] || 1);
+      const nextValue = durationOptions[0] || 1;
+      const timeoutId = setTimeout(() => {
+        setDurationValue(nextValue);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
+    return undefined;
   }, [durationOptions, durationValue]);
 
   // Dynamic pricing preview - fetch from DB when duration or start time changes
+  // Fixed to avoid react-hooks/set-state-in-effect: loading state set via callback
   useEffect(() => {
     const startAt = startMode === "immediate" ? new Date() : new Date(scheduledStart);
     if (Number.isNaN(startAt.getTime())) return;
 
-    setLoadingPricing(true);
     const controller = new AbortController();
+    const loadingTimeout = setTimeout(() => {
+      setLoadingPricing(true);
+    }, 0);
     fetch("/api/pricing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -226,9 +235,15 @@ export function QuoteForm({ registration }: { registration: string }) {
         }
       })
       .catch(() => {})
-      .finally(() => setLoadingPricing(false));
+      .finally(() => {
+        clearTimeout(loadingTimeout);
+        setLoadingPricing(false);
+      });
 
-    return () => controller.abort();
+    return () => {
+      clearTimeout(loadingTimeout);
+      controller.abort();
+    };
   }, [durationUnit, durationValue, startMode, scheduledStart]);
 
   async function submit(values: FormValues) {

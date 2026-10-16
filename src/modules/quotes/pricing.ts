@@ -1,4 +1,5 @@
 import { CuvvafyPricing } from "@/models/CuvvafyPricing";
+import type { CuvvafyPricingConfig } from "@/models/CuvvafyPricing";
 
 export type DurationUnit = "hours" | "days" | "weeks";
 export type PricingCategory = "past" | "present" | "future";
@@ -54,36 +55,36 @@ export function getPricingCategory(startAt?: Date, referenceNow = new Date(), gr
   return "present";
 }
 
-function toPlainMap(map: any): Record<string, number> {
+function toPlainMap(map: unknown): Record<string, number> {
   if (!map) return {};
   if (map instanceof Map) {
     const obj: Record<string, number> = {};
-    for (const [k, v] of map.entries()) obj[String(k)] = Number(v);
+    for (const [k, v] of (map as Map<string, unknown>).entries()) obj[String(k)] = Number(v);
     return obj;
   }
   // If it's a plain object
   if (typeof map === "object") {
     const obj: Record<string, number> = {};
-    for (const [k, v] of Object.entries(map)) {
+    for (const [k, v] of Object.entries(map as Record<string, unknown>)) {
       // Skip mongoose internal
       if (k.startsWith("$") || k.startsWith("_")) continue;
-      obj[k] = Number(v);
+      obj[k] = Number(v as number);
     }
     return obj;
   }
   return {};
 }
 
-export async function getPricingConfig() {
+export async function getPricingConfig(): Promise<CuvvafyPricingConfig | null> {
   try {
     // Avoid hanging when mongoose not connected (tests without DB)
     const mongoose = await import("mongoose");
     if (mongoose.default.connection.readyState !== 1) {
       return null;
     }
-    const config = await (CuvvafyPricing as any).findOne({ configId: "global", isActive: true }).lean().maxTimeMS(2000).exec();
+    const config = await CuvvafyPricing.findOne({ configId: "global", isActive: true }).lean().maxTimeMS(2000).exec();
     if (!config) return null;
-    return config;
+    return config as unknown as CuvvafyPricingConfig;
   } catch {
     return null;
   }
@@ -99,7 +100,7 @@ export async function calculateQuotePrice(
   const safeUnit = (["hours", "days", "weeks"].includes(unit) ? unit : "hours") as DurationUnit;
 
   // Try to get dynamic pricing from DB
-  let dbConfig: any = null;
+  let dbConfig: CuvvafyPricingConfig | null = null;
   try {
     dbConfig = await getPricingConfig();
   } catch {

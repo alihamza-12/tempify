@@ -31,8 +31,6 @@ export type CuvvafyPricingConfig = {
   isActive: boolean;
 };
 
-const priceMapMixed = new mongoose.Schema({}, { _id: false, strict: false });
-
 const formulaUnitSchema = new mongoose.Schema(
   {
     base: { type: Number, default: 0 },
@@ -91,6 +89,11 @@ const cuvvafyPricingSchema = new mongoose.Schema(
   { timestamps: true, collection: "cuvvafy_pricings" }
 );
 
+type CuvvafyPricingDocument = mongoose.Document & CuvvafyPricingConfig & {
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 export const CuvvafyPricing =
-  (mongoose.models.CuvvafyPricing as mongoose.Model<any>) ||
-  mongoose.model("CuvvafyPricing", cuvvafyPricingSchema);
+  (mongoose.models.CuvvafyPricing as mongoose.Model<CuvvafyPricingDocument>) ||
+  mongoose.model<CuvvafyPricingDocument>("CuvvafyPricing", cuvvafyPricingSchema);
