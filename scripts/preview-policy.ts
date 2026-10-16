@@ -29,12 +29,12 @@ async function main() {
   const message = await transport.sendMail({
     ...bundle,
     from: "Cuvva Template Preview <preview@example.invalid>",
-    subject: `[SAMPLE - NOT VALID INSURANCE] ${bundle.subject}`,
+    subject: bundle.subject,
     html: emailHtml,
     headers: { "X-Tempify-Preview": "sample-not-valid-insurance" },
   });
   await writeFile(path.join(output, "sample-policy-email.eml"), message.message);
-  await writeFile(path.join(output, "README.txt"), "LOCAL TEMPLATE PREVIEW ONLY\n\nAll PDFs use fictional data and have SAMPLE / NOT VALID INSURANCE markings.\nemail-preview.html embeds the same logo, badges and icons for offline viewing.\nsample-policy-email.eml is an unsent MIME message with all three PDFs and inline assets; open in a compatible mail client.\nNo SMTP connection, payment, database write or policy issuance occurred.\nThe original source and static PDFs remain unchanged in vendor/cuvva; only preview outputs are watermarked.\n");
+  await writeFile(path.join(output, "README.txt"), "LOCAL TEMPLATE PREVIEW ONLY\n\nAll PDFs use fictional data and the original document layout.\nemail-preview.html embeds the same logo, badges and icons for offline viewing.\nsample-policy-email.eml is an unsent MIME message with all three PDFs and inline assets; open in a compatible mail client.\nNo SMTP connection, payment, database write or policy issuance occurred.\nThe original source and static PDFs remain unchanged in vendor/cuvva.\n");
   console.log(`Local preview written to ${output}. No email sent; no policy issued.`);
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

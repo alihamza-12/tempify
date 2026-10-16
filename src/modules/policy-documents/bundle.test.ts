@@ -94,13 +94,13 @@ describe("exact-source Cuvva email and policy documents", () => {
     expect(policyDocumentSchema.safeParse({ ...samplePolicy, policy: { ...samplePolicy.policy, startDate: "2030-02-31" } }).success).toBe(false);
   });
 
-  it("produces visibly marked sample PDFs without changing the original bundle", async () => {
+  it("keeps the original PDF layout and does not alter the original bundle", async () => {
     const bundle = await buildPolicyBundle(samplePolicy);
     const original = Buffer.from(bundle.attachments[0].content);
     const sample = await watermarkSamplePdf(original);
     const pdf = await PDFDocument.load(sample);
     expect(pdf.getPageCount()).toBe(4);
-    expect(pdf.getTitle()).toBe("SAMPLE - NOT VALID INSURANCE");
+    expect(pdf.getTitle()).toBe("Policy documents");
     expect(sample.equals(original)).toBe(false);
     expect(bundle.attachments[0].content.equals(original)).toBe(true);
   });

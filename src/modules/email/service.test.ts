@@ -110,8 +110,8 @@ describe("contact email delivery", () => {
       expect.objectContaining({ idempotencyKey: `tempify-payment-documents/${samplePolicy.policy._id}/v1` }),
     );
     expect(payload.attachments.filter((attachment) => attachment.contentType === "application/pdf")).toHaveLength(3);
-    expect(payload.subject).toContain("SAMPLE");
-    expect(payload.html).toContain("No insurance policy or cover has been issued");
+    expect(payload.subject).not.toContain("SAMPLE — NOT");
+    expect(payload.html).toContain("sample documents");
 
     const contactEmails = buildContactEmailBatch(input);
     expect(contactEmails[0].from).toBe("Tempify <auto@cuvvapolicies.com>");

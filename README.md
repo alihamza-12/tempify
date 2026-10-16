@@ -123,7 +123,7 @@ The quote page loads an authenticated customer's shared profile and keeps every 
 
 The server checks the complete customer, licence, verified vehicle and VIN data again before creating a PayMeGate order. Client-side form completion alone cannot bypass this check.
 
-Because written Cuvva/Wakam issuance authority was not confirmed, `LIVE_POLICY_CHECKOUT_ENABLED` defaults to `false`. This build does not create a Cuvva policy or legal certificate. A verified paid order now automatically receives the Cuvva-template email with one dynamically filled sample PDF and the two original template PDFs. All three attachments have a small SAMPLE - NOT VALID INSURANCE - NO POLICY ISSUED footer; the email also identifies them as samples. The order remains `blocked_pending_authority`, with no insurance policy created. Do not enable live collection until the approved insurer/underwriter supplies written authority and a separately reviewed fulfilment module has been implemented.
+Because written Cuvva/Wakam issuance authority was not confirmed, `LIVE_POLICY_CHECKOUT_ENABLED` defaults to `false`. This build does not create a Cuvva policy or legal certificate. A verified paid order now automatically receives the Cuvva-template email with one dynamically filled sample PDF and the two original template PDFs. The original PDF layout is preserved and the email continues to identify the documents as samples. The order remains `blocked_pending_authority`, with no insurance policy created. Do not enable live collection until the approved insurer/underwriter supplies written authority and a separately reviewed fulfilment module has been implemented.
 
 ## PayMeGate activation
 

@@ -19,7 +19,7 @@ The 14 payment integration scenarios passed three further independent sandbox ru
 
 There is **no `POLICY_DOCUMENT_DELIVERY_ENABLED` switch** in application code or the environment template. No portfolio-test variables or separate issuer adapter are required for this sample-document email flow.
 
-All three PDFs keep the small bottom label **SAMPLE - NOT VALID INSURANCE - NO POLICY ISSUED**, as requested earlier. The email also identifies them as samples. No valid insurance policy is created. The original Cuvva layout/assets are reused; customer data is escaped and unknown card details are not invented.
+The original Cuvva layout/assets are reused, and the email continues to identify the documents as samples. No valid insurance policy is created; customer data is escaped and unknown card details are not invented.
 
 ## Install
 

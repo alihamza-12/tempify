@@ -73,7 +73,7 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
         {!order.policyIssued && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-100">
             <strong className="block text-base text-red-300">No insurance policy or certificate has been issued</strong>
-            All three PDF attachments are marked SAMPLE — NOT VALID INSURANCE — NO POLICY ISSUED. They are not proof of insurance. Do not drive in reliance on this payment confirmation.
+            They are not proof of insurance. Do not drive in reliance on this payment confirmation.
           </div>
         )}
 
