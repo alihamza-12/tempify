@@ -146,6 +146,27 @@ jobs:
           NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
           test "$NODE_MAJOR" -ge 20 || { echo "Node.js 20 or newer is required"; exit 1; }
 
+          echo "Cleaning previous build artifacts and fixing permissions (EACCES fix)..."
+          # Previous .next may be owned by root if manual deploy was done as root
+          # This caused: Error: EACCES: permission denied, unlink '/var/www/tempify/.next/.../_not-found.html'
+          if [ -d .next ]; then
+            echo "Found existing .next, removing..."
+            rm -rf .next 2>/dev/null || {
+              echo ".next owned by different user, trying sudo chown + rm..."
+              sudo chown -R $(whoami):$(whoami) "$DEPLOY_PATH" 2>/dev/null || true
+              sudo rm -rf "$DEPLOY_PATH/.next" 2>/dev/null || true
+              rm -rf .next 2>/dev/null || true
+            }
+          fi
+          # Extra safety: ensure no stale cache remains
+          rm -rf .next 2>/dev/null || true
+          # Ensure deploy path is writable by current user
+          chmod -R u+rwX "$DEPLOY_PATH" 2>/dev/null || {
+            sudo chown -R $(whoami):$(whoami) "$DEPLOY_PATH" 2>/dev/null || true
+            chmod -R u+rwX "$DEPLOY_PATH" 2>/dev/null || true
+          }
+          echo "Clean done, starting install..."
+
           npm ci
           npm run build
 
