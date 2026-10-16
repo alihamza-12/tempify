@@ -19,7 +19,7 @@ vi.mock("@/modules/payments/paymegate", () => ({
   mapPaymentStatus: (status: string) => status.toLowerCase(),
 }));
 
-import { GET } from "@/app/api/orders/[id]/route";
+import { GET } from "../../app/api/orders/[id]/route";
 
 const initial = {
   _id: "database-order", publicId: "local-order", userId: "customer-1",

@@ -13,7 +13,7 @@ vi.mock("@/modules/payments/paymegate", () => ({ createPayMeGateOrder: mocks.cre
 vi.mock("@/modules/profile/schema", () => ({ customerProfileSchema: { parse: (value: unknown) => value } }));
 vi.mock("@/modules/profile/service", () => ({ saveCustomerProfile: mocks.profile }));
 
-import { POST } from "@/app/api/checkout/route";
+import { POST } from "../../app/api/checkout/route";
 
 const call = () => POST(new Request("https://example.invalid/api/checkout", {
   method: "POST", headers: { "Content-Type": "application/json" },

@@ -10,9 +10,9 @@ import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
-import { POST as checkout } from "@/app/api/checkout/route";
-import { POST as webhook } from "@/app/api/webhooks/paymegate/route";
-import { GET as status } from "@/app/api/orders/[id]/route";
+import { POST as checkout } from "../../app/api/checkout/route";
+import { POST as webhook } from "../../app/api/webhooks/paymegate/route";
+import { GET as status } from "../../app/api/orders/[id]/route";
 
 type Remote = { orderUUID: string; externalId: string; amount: string; currency: string; status: string; checkoutUrl: string; paidTransactionUUID?: string; paidAt?: string; forced?: boolean };
 let mongo: MongoMemoryServer;

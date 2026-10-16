@@ -4,7 +4,7 @@ You confirmed applying `tempify-payment-email-updated-files.zip`. This newer **`
 
 The 14 payment integration scenarios passed three further independent sandbox runs. All 74 unit tests, typecheck, lint, production build and production dependency audit then passed again. No real charge, provider email or wallet transfer was made.
 
-**Update 15 Oct 2026 — CI type-check:** If you saw `TS2307`/`TS7006` in GitHub Actions, apply `tsconfig.json` (adds `baseUrl`) and the updated `src/modules/payments/payment.integration.ts` (explicit `Response` type). Then re-run `npm ci && npm run typecheck`.
+**Update 15 Oct 2026 — CI type-check:** If you saw `TS2307`/`TS7006` in GitHub Actions, apply the CI fix ZIP: it changes route imports to relative paths (`../../app/api/...`) and keeps `baseUrl` in `tsconfig.json`. Then run `npm ci && npm run typecheck`.
 
 ## What happens now
 
