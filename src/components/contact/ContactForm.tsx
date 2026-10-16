@@ -136,7 +136,7 @@ export function ContactForm({ initialSubject = "" }: { initialSubject?: string }
   }
 
   return (
-    <form id="contact-form" onSubmit={submit} noValidate className="scroll-mt-28 rounded-2xl border border-orange-500/25 bg-[#0d1421]/96 p-5 shadow-2xl shadow-black/30 sm:p-7">
+    <form id="contact-form" onSubmit={submit} noValidate className="scroll-mt-28 rounded-2xl border border-violet-500/25 bg-[#0d1421]/96 p-5 shadow-2xl shadow-black/30 sm:p-7">
       <h2 className="text-2xl font-black text-white">Get in Touch</h2>
       <p className="mt-1 text-sm text-slate-400">We typically respond within 24 hours</p>
 
@@ -168,10 +168,10 @@ export function ContactForm({ initialSubject = "" }: { initialSubject?: string }
         </label>
       </div>
 
-      <div className="mt-4 rounded-xl border border-orange-500/20 bg-black/20 p-4">
+      <div className="mt-4 rounded-xl border border-violet-500/20 bg-black/20 p-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-extrabold text-white"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500 text-white shadow-lg shadow-orange-500/25"><ShieldCheck size={18} /></span> Robot Verification</div>
-          <button type="button" onClick={() => void loadChallenge()} disabled={challengeLoading} aria-label="Get a new verification question" className="rounded-lg border border-white/10 p-2 text-slate-400 transition hover:border-orange-500/40 hover:text-orange-300 disabled:opacity-50"><RefreshCw size={15} className={challengeLoading ? "animate-spin" : ""} /></button>
+          <div className="flex items-center gap-2 font-extrabold text-white"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600 text-white shadow-lg shadow-violet-600/25"><ShieldCheck size={18} /></span> Robot Verification</div>
+          <button type="button" onClick={() => void loadChallenge()} disabled={challengeLoading} aria-label="Get a new verification question" className="rounded-lg border border-white/10 p-2 text-slate-400 transition hover:border-violet-500/40 hover:text-violet-300 disabled:opacity-50"><RefreshCw size={15} className={challengeLoading ? "animate-spin" : ""} /></button>
         </div>
         <p className="mt-4 text-xs text-slate-400">Please solve this simple math problem to verify you&apos;re human:</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -182,8 +182,8 @@ export function ContactForm({ initialSubject = "" }: { initialSubject?: string }
       </div>
 
       <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-black/15 p-4 text-xs leading-5 text-slate-400">
-        <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-orange-500" checked={acceptedPrivacy} onChange={(event) => setAcceptedPrivacy(event.target.checked)} />
-        <span>I agree to the <Link href="/privacy-policy" className="font-bold text-orange-300 underline underline-offset-2">Privacy Policy</Link> and consent to the processing of my personal data for this support request. *</span>
+        <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-violet-500" checked={acceptedPrivacy} onChange={(event) => setAcceptedPrivacy(event.target.checked)} />
+        <span>I agree to the <Link href="/privacy-policy" className="font-bold text-violet-300 underline underline-offset-2">Privacy Policy</Link> and consent to the processing of my personal data for this support request. *</span>
       </label>
 
       {error && <div className="error-box mt-4" role="alert">{error}</div>}

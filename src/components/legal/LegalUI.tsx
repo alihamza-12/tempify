@@ -5,10 +5,10 @@ export type LegalTone = "orange" | "blue" | "green" | "red" | "purple" | "slate"
 
 const tones: Record<LegalTone, { badge: string; border: string; header: string; text: string }> = {
   orange: {
-    badge: "bg-orange-500 text-white shadow-orange-500/25",
-    border: "border-orange-500/25",
-    header: "bg-gradient-to-r from-orange-500/12 to-transparent",
-    text: "text-orange-300",
+    badge: "bg-violet-600 text-white shadow-violet-600/25",
+    border: "border-violet-500/25",
+    header: "bg-gradient-to-r from-[#6a5cff]/12 to-transparent",
+    text: "text-violet-300",
   },
   blue: {
     badge: "bg-blue-500 text-white shadow-blue-500/25",
@@ -44,7 +44,7 @@ const tones: Record<LegalTone, { badge: string; border: string; header: string; 
 
 export function LegalPageShell({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`legal-page min-h-[calc(100vh-145px)] border-t border-orange-500/15 px-3 py-12 text-slate-200 sm:py-16 ${className}`}>
+    <div className={`legal-page min-h-[calc(100vh-145px)] border-t border-violet-500/15 px-3 py-12 text-slate-200 sm:py-16 ${className}`}>
       <div className="legal-content mx-auto w-full max-w-4xl">{children}</div>
     </div>
   );
@@ -64,18 +64,18 @@ export function LegalHeroCard({
   lastUpdated?: string;
 }) {
   return (
-    <header className="overflow-hidden rounded-2xl border border-orange-500/25 bg-[radial-gradient(circle_at_80%_10%,rgba(255,101,8,.12),transparent_35%),linear-gradient(125deg,rgba(28,40,60,.94),rgba(11,15,24,.98))] p-5 shadow-2xl shadow-black/30 sm:p-7">
+    <header className="overflow-hidden rounded-2xl border border-violet-500/25 bg-[radial-gradient(circle_at_80%_10%,rgba(106,92,255,.18),transparent_35%),linear-gradient(125deg,rgba(21,24,52,.94),rgba(11,14,32,.98))] p-5 shadow-2xl shadow-black/30 sm:p-7">
       <div className="flex items-start gap-4">
-        <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl border border-orange-500/30 bg-orange-500/15 text-orange-400">
+        <div className="flex h-13 w-13 shrink-0 items-center justify-center rounded-xl border border-violet-500/25 bg-violet-500/15 text-violet-400">
           <Icon size={25} />
         </div>
         <div>
-          <span className="inline-flex rounded-full border border-orange-500/25 bg-orange-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.12em] text-orange-300">{eyebrow}</span>
+          <span className="inline-flex rounded-full border border-violet-500/25 bg-violet-500/10 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-[.12em] text-violet-300">{eyebrow}</span>
           <h1 className="mt-2 text-3xl font-black tracking-[-.04em] text-white sm:text-4xl">{title}</h1>
           <p className="mt-1 text-sm text-slate-400">{subtitle}</p>
         </div>
       </div>
-      <div className="mt-6 rounded-lg border border-orange-500/25 bg-orange-950/25 px-4 py-3 text-xs font-semibold text-orange-200">Last updated: {lastUpdated}</div>
+      <div className="mt-6 rounded-lg border border-violet-500/25 bg-violet-950/25 px-4 py-3 text-xs font-semibold text-violet-200">Last updated: {lastUpdated}</div>
     </header>
   );
 }

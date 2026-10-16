@@ -60,7 +60,7 @@ export function ProfileForm({ initialProfile }: { initialProfile: ProfileFormVal
   return (
     <section className="panel mt-6 rounded-[26px] p-5 sm:p-7">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/15 text-orange-400">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
           <UserRound size={20} />
         </span>
         <div>

@@ -90,7 +90,7 @@ export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; c
     <>
       <div className="panel rounded-[26px] p-5 sm:p-8">
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-orange-500 text-white"><CheckCircle2 size={29} /></div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-violet-600 text-white"><CheckCircle2 size={29} /></div>
           <h1 className="mt-4 text-2xl font-black sm:text-3xl">Review your details</h1>
           <p className="mt-2 text-sm text-slate-400">Check everything before continuing to secure payment</p>
         </div>
@@ -118,7 +118,7 @@ export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; c
             {quote.licence.lastFourDigits && <ReviewRow label="Saved payment card" value={`Ending ${quote.licence.lastFourDigits}`} />}
           </ReviewSection>
 
-          <div className="overflow-hidden rounded-2xl border border-orange-400/20 bg-gradient-to-br from-[#ef5a08] to-[#c93808] p-5 sm:p-6">
+          <div className="overflow-hidden rounded-2xl border border-violet-400/20 bg-gradient-to-br from-[#5e4bff] to-[#7a5cff] p-5 sm:p-6">
             <div className="flex items-center gap-2 font-extrabold"><CreditCard size={18} /> Total price</div>
             <div className="mt-5 rounded-xl bg-white/10 py-6 text-center text-4xl font-black sm:text-5xl">{money}</div>
             {quote.pricing.pastStartSurchargeApplied && Number(quote.pricing.surchargeAmount) > 0 && (
@@ -129,7 +129,7 @@ export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; c
             )}
             <div className="mt-4 rounded-xl border border-white/20 p-4">
               <label className="mb-2 flex items-center gap-2 text-sm font-bold"><Tag size={16} /> Promo code</label>
-              <div className="flex gap-2"><input value={promo} onChange={(e) => setPromo(e.target.value)} className="min-w-0 flex-1 rounded-lg border-0 bg-white px-3 text-sm text-slate-900 outline-none" placeholder="Promo code" /><button type="button" onClick={() => setPromoMessage(promo ? "This code is not currently active." : "Enter a promo code first.")} className="rounded-lg bg-white px-4 py-3 text-sm font-extrabold text-orange-600">Apply</button></div>
+              <div className="flex gap-2"><input value={promo} onChange={(e) => setPromo(e.target.value)} className="min-w-0 flex-1 rounded-lg border-0 bg-white px-3 text-sm text-slate-900 outline-none" placeholder="Promo code" /><button type="button" onClick={() => setPromoMessage(promo ? "This code is not currently active." : "Enter a promo code first.")} className="rounded-lg bg-white px-4 py-3 text-sm font-extrabold text-violet-600">Apply</button></div>
               {promoMessage && <p className="mt-2 text-xs text-white/80">{promoMessage}</p>}
             </div>
           </div>
@@ -151,6 +151,6 @@ export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; c
 }
 
 function ReviewSection({ icon: Icon, title, children }: { icon: typeof UserRound; title: string; children: React.ReactNode }) {
-  return <section className="rounded-2xl border border-white/10 bg-[#172233] p-4 sm:p-5"><h2 className="mb-3 flex items-center gap-2.5 font-extrabold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400"><Icon size={16} /></span>{title}</h2>{children}</section>;
+  return <section className="rounded-2xl border border-white/10 bg-[#172233] p-4 sm:p-5"><h2 className="mb-3 flex items-center gap-2.5 font-extrabold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400"><Icon size={16} /></span>{title}</h2>{children}</section>;
 }
 function ReviewRow({ label, value }: { label: string; value: string }) { return <div className="flex flex-col gap-1 border-t border-white/8 py-3 text-sm first:border-0 sm:flex-row sm:items-start sm:justify-between"><span className="text-slate-500">{label}</span><span className="max-w-md text-left font-bold text-white sm:text-right">{value}</span></div>; }

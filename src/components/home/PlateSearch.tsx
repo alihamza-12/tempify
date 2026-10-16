@@ -37,9 +37,9 @@ export function PlateSearch({ compact = false }: { compact?: boolean }) {
           <p className="mt-1.5 text-sm text-slate-400">Enter a UK registration to get started</p>
         </div>
       )}
-      <div className="overflow-hidden rounded-2xl border border-orange-500/70 bg-[#111a2a] shadow-[0_0_0_1px_rgba(255,100,8,.1),0_18px_40px_rgba(255,91,0,.12)]">
+      <div className="overflow-hidden rounded-2xl border border-violet-500/60 bg-[#111a2a] shadow-[0_0_0_1px_rgba(106,92,255,.18),0_18px_40px_rgba(90,70,255,.18)]">
         <div className="flex min-h-16 items-stretch">
-          <div className="flex w-16 shrink-0 items-center justify-center bg-gradient-to-b from-orange-500 to-orange-600 text-sm font-black text-white">GB</div>
+          <div className="flex w-16 shrink-0 items-center justify-center bg-gradient-to-b from-[#6a5cff] to-[#7a5cff] text-sm font-black text-white">GB</div>
           <input
             value={registration}
             onChange={(event) => setRegistration(event.target.value.toUpperCase())}

@@ -149,7 +149,7 @@ export function AuthForm({
   return (
     <div>
       <div className="mb-6 text-center">
-        <div className="brand-gradient mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg shadow-orange-500/20">
+        <div className="brand-gradient mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg shadow-violet-600/20">
           {mode === "otp" ? <MailCheck size={25} /> : <LockKeyhole size={24} />}
         </div>
         <h2 className="mt-4 text-2xl font-black text-white">{mode === "register" ? "Create your account" : mode === "login" ? "Welcome back" : "Check your email"}</h2>
@@ -200,7 +200,7 @@ export function AuthForm({
                 aria-invalid={Boolean(fieldErrors.password)}
                 aria-describedby="auth-password-help"
               />
-              <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/8 hover:text-orange-300" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
+              <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white/8 hover:text-violet-300" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
                 {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
               </button>
             </div>
@@ -215,8 +215,8 @@ export function AuthForm({
         {mode === "register" && (
           <div>
             <label className="flex cursor-pointer items-start gap-3 text-sm leading-5 text-slate-400">
-              <input type="checkbox" checked={accepted} onChange={(event) => { setAccepted(event.target.checked); setFieldError("accepted", ""); }} className="mt-1 h-4 w-4 accent-orange-500" />
-              <span>I agree to the <a href="/terms-of-service" className="text-orange-400 underline">Terms of Service</a> and <a href="/privacy-policy" className="text-orange-400 underline">Privacy Policy</a>.</span>
+              <input type="checkbox" checked={accepted} onChange={(event) => { setAccepted(event.target.checked); setFieldError("accepted", ""); }} className="mt-1 h-4 w-4 accent-violet-500" />
+              <span>I agree to the <a href="/terms-of-service" className="text-violet-400 underline">Terms of Service</a> and <a href="/privacy-policy" className="text-violet-400 underline">Privacy Policy</a>.</span>
             </label>
             <FieldError message={fieldErrors.accepted} />
           </div>
@@ -240,8 +240,8 @@ export function AuthForm({
 
       {mode !== "otp" && (
         <p className="mt-5 text-center text-sm text-slate-500">
-          {mode === "register" ? "Already have an account?" : "New to Tempify?"}{" "}
-          <button type="button" onClick={() => switchMode(mode === "register" ? "login" : "register")} className="font-bold text-orange-400 underline">{mode === "register" ? "Sign in" : "Create account"}</button>
+          {mode === "register" ? "Already have an account?" : "New to Cuvvafy?"}{" "}
+          <button type="button" onClick={() => switchMode(mode === "register" ? "login" : "register")} className="font-bold text-violet-400 underline">{mode === "register" ? "Sign in" : "Create account"}</button>
         </p>
       )}
       {mode === "otp" && <button type="button" onClick={() => { setMode("register"); setFieldErrors({}); setMessage(""); }} className="mt-4 w-full text-center text-sm font-bold text-slate-400 underline">Use a different email</button>}

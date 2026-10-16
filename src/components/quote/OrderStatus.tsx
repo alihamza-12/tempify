@@ -78,14 +78,14 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
         )}
 
         <div className="rounded-2xl border border-white/10 bg-[#172233] p-5">
-          <h2 className="flex items-center gap-2 text-lg font-extrabold"><Smartphone size={19} className="text-orange-400" /> Add Tempify to your home screen</h2>
+          <h2 className="flex items-center gap-2 text-lg font-extrabold"><Smartphone size={19} className="text-violet-400" /> Add Cuvvafy to your home screen</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <InstallBlock title="On iPhone or iPad" steps={["Open this page in Safari", "Tap the Share button", "Choose Add to Home Screen", "Tap Add"]} />
             <InstallBlock title="On Android" steps={["Open this page in Chrome", "Tap the browser menu", "Choose Add to Home screen", "Confirm Install"]} />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-orange-500/20 bg-orange-500/8 p-4 text-sm leading-6 text-orange-100">
+        <div className="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-4 text-sm leading-6 text-violet-100">
           Your username is your email address. Use the password you created during verification—passwords are never displayed or emailed for security.
         </div>
 
@@ -99,7 +99,7 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
 }
 
 function StateCard({ icon: Icon, title, text, tone, spinning = false }: { icon: typeof Clock3; title: string; text: string; tone: "waiting" | "error"; spinning?: boolean }) {
-  return <div className="panel rounded-[28px] p-8 text-center"><div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${tone === "waiting" ? "bg-orange-500/15 text-orange-400" : "bg-red-500/15 text-red-400"}`}><Icon size={31} className={spinning ? "animate-spin" : ""} /></div><h1 className="mt-5 text-2xl font-black">{title}</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-400">{text}</p></div>;
+  return <div className="panel rounded-[28px] p-8 text-center"><div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${tone === "waiting" ? "bg-violet-500/15 text-violet-400" : "bg-red-500/15 text-red-400"}`}><Icon size={31} className={spinning ? "animate-spin" : ""} /></div><h1 className="mt-5 text-2xl font-black">{title}</h1><p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-400">{text}</p></div>;
 }
-function Summary({ icon: Icon, label, value }: { icon: typeof MailCheck; label: string; value: string }) { return <div className="rounded-2xl border border-white/8 bg-[#111a29] p-4"><Icon size={18} className="text-orange-400" /><div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div><div className="mt-1 break-words text-sm font-extrabold">{value}</div></div>; }
-function InstallBlock({ title, steps }: { title: string; steps: string[] }) { return <div className="rounded-xl bg-[#111a29] p-4"><h3 className="font-extrabold">{title}</h3><ol className="mt-3 space-y-2 text-sm text-slate-400">{steps.map((step, index) => <li key={step} className="flex gap-2"><span className="font-bold text-orange-400">{index + 1}.</span>{step}</li>)}</ol></div>; }
+function Summary({ icon: Icon, label, value }: { icon: typeof MailCheck; label: string; value: string }) { return <div className="rounded-2xl border border-white/8 bg-[#111a29] p-4"><Icon size={18} className="text-violet-400" /><div className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</div><div className="mt-1 break-words text-sm font-extrabold">{value}</div></div>; }
+function InstallBlock({ title, steps }: { title: string; steps: string[] }) { return <div className="rounded-xl bg-[#111a29] p-4"><h3 className="font-extrabold">{title}</h3><ol className="mt-3 space-y-2 text-sm text-slate-400">{steps.map((step, index) => <li key={step} className="flex gap-2"><span className="font-bold text-violet-400">{index + 1}.</span>{step}</li>)}</ol></div>; }

@@ -51,7 +51,7 @@ export async function createPayMeGateOrder(input: {
       paymentMethodsKeys: ["*"],
       backUrl: input.backUrl,
       customer: { email: input.email, fullName: input.fullName },
-      description: "Tempify vehicle cover",
+      description: "Cuvvafy vehicle cover",
       metadata: input.metadata,
     }),
     cache: "no-store",

@@ -17,15 +17,15 @@ export type PaymentReceiptInput = {
 /**
  * This is deliberately a payment receipt, not an insurance certificate. Legal
  * policy/certificate generation must remain disabled until written issuer and
- * underwriter authority is confirmed for the Tempify self-service channel.
+ * underwriter authority is confirmed for the Cuvvafy self-service channel.
  */
 export async function generatePaymentReceipt(input: PaymentReceiptInput) {
   const document = new PDFDocument({
     size: "A4",
     margin: 52,
     info: {
-      Title: `Tempify payment receipt ${input.orderId}`,
-      Author: "Tempify",
+      Title: `Cuvvafy payment receipt ${input.orderId}`,
+      Author: "Cuvvafy",
       Subject: "Payment receipt — not proof of insurance",
     },
   });
@@ -39,8 +39,8 @@ export async function generatePaymentReceipt(input: PaymentReceiptInput) {
   document
     .font("Helvetica-Bold")
     .fontSize(13)
-    .fillColor("#f35a09")
-    .text("TEMPIFY", { characterSpacing: 2 });
+    .fillColor("#6a5cff")
+    .text("CUVVAFY", { characterSpacing: 2 });
   document.moveDown(0.7);
   document.fontSize(25).fillColor("#152033").text("Payment receipt");
   document.moveDown(0.6);

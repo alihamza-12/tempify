@@ -9,7 +9,7 @@ function getResend() {
 }
 
 function emailShell(title: string, body: string) {
-  return `<!doctype html><html><body style="margin:0;background:#f2f4f8;font-family:Arial,sans-serif;color:#152033"><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 14px"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:white;border-radius:18px;overflow:hidden;border:1px solid #e7eaf0"><tr><td style="padding:30px;background:linear-gradient(135deg,#f35a09,#f2a900);color:white"><div style="font-size:14px;font-weight:800;letter-spacing:.16em">TEMPIFY</div><h1 style="margin:12px 0 0;font-size:28px">${title}</h1></td></tr><tr><td style="padding:32px">${body}</td></tr><tr><td style="padding:20px 32px;border-top:1px solid #eef0f4;color:#7d8494;font-size:12px">© ${new Date().getFullYear()} Tempify. This is an automated service email.</td></tr></table></td></tr></table></body></html>`;
+  return `<!doctype html><html><body style="margin:0;background:#f2f4f8;font-family:Arial,sans-serif;color:#152033"><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 14px"><table width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;background:white;border-radius:18px;overflow:hidden;border:1px solid #e7eaf0"><tr><td style="padding:30px;background:linear-gradient(135deg,#5e4bff,#8b5cf6);color:white"><div style="font-size:14px;font-weight:800;letter-spacing:.16em">CUVVAFY</div><h1 style="margin:12px 0 0;font-size:28px">${title}</h1></td></tr><tr><td style="padding:32px">${body}</td></tr><tr><td style="padding:20px 32px;border-top:1px solid #eef0f4;color:#7d8494;font-size:12px">© ${new Date().getFullYear()} Cuvvafy. This is an automated service email.</td></tr></table></td></tr></table></body></html>`;
 }
 
 export async function sendVerificationEmail(input: {
@@ -29,12 +29,12 @@ export async function sendVerificationEmail(input: {
   }
 
   const result = await resend.emails.send({
-    from: process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>",
+    from: process.env.EMAIL_FROM || "Cuvvafy <auto@cuvvapolicies.com>",
     to: input.email,
-    subject: `${input.code} is your Tempify verification code`,
+    subject: `${input.code} is your Cuvvafy verification code`,
     html: emailShell(
       "Verify your email",
-      `<p style="font-size:16px;line-height:1.7">Hi ${escapeHtml(input.firstName)},</p><p style="font-size:16px;line-height:1.7">Use this one-time code to finish creating your account:</p><div style="margin:28px 0;padding:18px;text-align:center;background:#fff4e8;border:1px solid #ffd6ad;border-radius:12px;font-size:32px;font-weight:800;letter-spacing:.24em;color:#ea580c">${input.code}</div><p style="color:#697386">The code expires in 10 minutes. If you did not request it, you can ignore this email.</p>`,
+      `<p style="font-size:16px;line-height:1.7">Hi ${escapeHtml(input.firstName)},</p><p style="font-size:16px;line-height:1.7">Use this one-time code to finish creating your account:</p><div style="margin:28px 0;padding:18px;text-align:center;background:#f0eaff;border:1px solid #c4b5fd;border-radius:12px;font-size:32px;font-weight:800;letter-spacing:.24em;color:#6d28d9">${input.code}</div><p style="color:#697386">The code expires in 10 minutes. If you did not request it, you can ignore this email.</p>`,
     ),
   });
 
@@ -103,7 +103,7 @@ type ContactEmailInput = {
  * acknowledgement that does not expose the private support destination.
  */
 export function buildContactEmailBatch(input: ContactEmailInput) {
-  const from = process.env.EMAIL_FROM || "Tempify <auto@cuvvapolicies.com>";
+  const from = process.env.EMAIL_FROM || "Cuvvafy <auto@cuvvapolicies.com>";
   const supportTo = process.env.CONTACT_TO_EMAIL || "support@cuvvapolicies.com";
   const cleanSubject = input.subject.replace(/[\r\n]+/g, " ").trim();
   const safeSubject = escapeHtml(cleanSubject);
@@ -117,7 +117,7 @@ export function buildContactEmailBatch(input: ContactEmailInput) {
       from,
       to: [supportTo],
       replyTo: input.email,
-      subject: `[Tempify support] ${cleanSubject}`,
+      subject: `[Cuvvafy support] ${cleanSubject}`,
       html: emailShell(
         "New support request",
         `<p style="font-size:16px;line-height:1.7"><strong>From:</strong> ${safeFullName} (${safeEmail})</p><p style="font-size:16px;line-height:1.7"><strong>Subject:</strong> ${safeSubject}</p><div style="margin-top:22px;padding:18px;background:#f7f8fb;border-radius:12px;font-size:15px;line-height:1.7">${safeMessage}</div>`,
@@ -126,10 +126,10 @@ export function buildContactEmailBatch(input: ContactEmailInput) {
     {
       from,
       to: [input.email],
-      subject: "We received your Tempify message",
+      subject: "We received your Cuvvafy message",
       html: emailShell(
         "We received your message",
-        `<p style="font-size:16px;line-height:1.7">Hi ${safeFirstName},</p><p style="font-size:16px;line-height:1.7">Thanks for contacting Tempify. We received your message about <strong>${safeSubject}</strong> and aim to respond within 24 hours.</p><p style="color:#697386;line-height:1.6">This acknowledgement confirms receipt of your enquiry only. It does not create a payment, insurance policy or insurance cover.</p>`,
+        `<p style="font-size:16px;line-height:1.7">Hi ${safeFirstName},</p><p style="font-size:16px;line-height:1.7">Thanks for contacting Cuvvafy. We received your message about <strong>${safeSubject}</strong> and aim to respond within 24 hours.</p><p style="color:#697386;line-height:1.6">This acknowledgement confirms receipt of your enquiry only. It does not create a payment, insurance policy or insurance cover.</p>`,
       ),
     },
   ];

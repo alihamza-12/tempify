@@ -30,7 +30,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   };
 
   return (
-    <div className="min-h-[calc(100vh-145px)] bg-[radial-gradient(circle_at_top,rgba(255,100,8,.12),transparent_28%),#f5f6f8] px-3 py-10 sm:py-14">
+    <div className="min-h-[calc(100vh-145px)] bg-[radial-gradient(circle_at_top,rgba(106,92,255,.14),transparent_28%),#f5f6f8] px-3 py-10 sm:py-14">
       <div className="mx-auto max-w-3xl"><ReviewClient quote={JSON.parse(JSON.stringify(serializable))} checkoutEnabled={process.env.LIVE_POLICY_CHECKOUT_ENABLED === "true"} /></div>
     </div>
   );
@@ -49,9 +49,9 @@ async function loadQuote(publicId: string) {
 
 function ReviewTemporarilyUnavailable({ id }: { id: string }) {
   return (
-    <div className="min-h-[calc(100vh-145px)] bg-[radial-gradient(circle_at_top,rgba(255,100,8,.16),transparent_30%),#07080b] px-3 py-16">
+    <div className="min-h-[calc(100vh-145px)] bg-[radial-gradient(circle_at_top,rgba(106,92,255,.18),transparent_30%),#060812] px-3 py-16">
       <div className="panel mx-auto max-w-lg rounded-[28px] p-6 text-center sm:p-9">
-        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-500/25 bg-orange-500/10 text-orange-400"><DatabaseZap size={29} /></span>
+        <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/10 text-violet-400"><DatabaseZap size={29} /></span>
         <h1 className="mt-5 text-2xl font-black text-white sm:text-3xl">Your quote is temporarily unavailable</h1>
         <p className="mt-3 text-sm leading-6 text-slate-400">We could not reach the secure quote database. Your details have not been changed. Check the database connection and try again.</p>
         <div className="mt-7 grid gap-3 sm:grid-cols-2">

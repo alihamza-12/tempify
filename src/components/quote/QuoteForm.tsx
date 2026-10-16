@@ -227,7 +227,7 @@ export function QuoteForm({ registration }: { registration: string }) {
 
       <SectionCard icon={CarFront} title="Vehicle details" accent="emerald">
         {loadingVehicle ? (
-          <div className="flex items-center gap-3 text-sm text-slate-400"><LoaderCircle size={18} className="animate-spin text-orange-400" /> Verifying your vehicle…</div>
+          <div className="flex items-center gap-3 text-sm text-slate-400"><LoaderCircle size={18} className="animate-spin text-violet-400" /> Verifying your vehicle…</div>
         ) : vehicleError ? (
           <div className="error-box">{vehicleError}</div>
         ) : vehicle ? (
@@ -245,13 +245,13 @@ export function QuoteForm({ registration }: { registration: string }) {
         <FieldLabel text="Duration type" />
         <div className="grid grid-cols-3 gap-2">
           {(["hours", "days", "weeks"] as const).map((unit) => (
-            <button key={unit} type="button" onClick={() => { setDurationUnit(unit); setDurationValue(1); }} className={`min-h-11 rounded-xl border text-sm font-bold capitalize transition ${durationUnit === unit ? "border-orange-500 bg-orange-500 text-white shadow-lg shadow-orange-600/20" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{unit}</button>
+            <button key={unit} type="button" onClick={() => { setDurationUnit(unit); setDurationValue(1); }} className={`min-h-11 rounded-xl border text-sm font-bold capitalize transition ${durationUnit === unit ? "border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-600/20" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{unit}</button>
           ))}
         </div>
         <div className="mt-5">
           <FieldLabel text="How long?" />
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-            {durationOptions.map((value) => <button key={value} type="button" onClick={() => setDurationValue(value)} className={`min-h-11 rounded-xl border text-sm font-bold transition ${durationValue === value ? "border-orange-500 bg-orange-500/15 text-orange-300" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{value} {value === 1 ? durationUnit.slice(0, -1) : durationUnit}</button>)}
+            {durationOptions.map((value) => <button key={value} type="button" onClick={() => setDurationValue(value)} className={`min-h-11 rounded-xl border text-sm font-bold transition ${durationValue === value ? "border-violet-500 bg-violet-500/15 text-violet-300" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{value} {value === 1 ? durationUnit.slice(0, -1) : durationUnit}</button>)}
           </div>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -324,11 +324,11 @@ export function QuoteForm({ registration }: { registration: string }) {
       </SectionCard>
 
       <SectionCard icon={SlidersHorizontal} title="Vehicle modifications" accent="purple">
-        <div className="mb-5 rounded-xl border border-orange-500/20 bg-orange-500/8 px-4 py-3 text-sm text-orange-300">Tell us about any applicable modifications.</div>
+        <div className="mb-5 rounded-xl border border-violet-500/20 bg-violet-500/10 px-4 py-3 text-sm text-violet-300">Tell us about any applicable modifications.</div>
         <div className="grid gap-3 sm:grid-cols-2">
           {modifications.map(([value, label]) => (
             <label key={value} className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/8 bg-[#172233] px-4 py-3 text-sm text-slate-300 hover:border-white/20">
-              <input type="checkbox" className="h-4 w-4 accent-orange-500" checked={selectedModifications.includes(value)} onChange={(event) => setSelectedModifications((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))} />{label}
+              <input type="checkbox" className="h-4 w-4 accent-violet-500" checked={selectedModifications.includes(value)} onChange={(event) => setSelectedModifications((current) => event.target.checked ? [...current, value] : current.filter((item) => item !== value))} />{label}
             </label>
           ))}
         </div>

@@ -21,7 +21,7 @@ import { DotList, LegalHeroCard, LegalInfoCard, LegalPageShell, LegalSection } f
 
 export const metadata: Metadata = {
   title: "Terms of Service",
-  description: "The terms governing use of Tempify vehicle lookup, quoting, accounts and checkout.",
+  description: "The terms governing use of Cuvvafy vehicle lookup, quoting, accounts and checkout.",
 };
 
 export default function TermsPage() {
@@ -31,14 +31,14 @@ export default function TermsPage() {
 
       <div className="mt-6 space-y-4">
         <LegalSection number={1} title="Agreement Overview">
-          <p>These Terms of Service form an agreement between you and Tempify when you access the website, create an account, request a vehicle quote, or continue to hosted checkout.</p>
+          <p>These Terms of Service form an agreement between you and Cuvvafy when you access the website, create an account, request a vehicle quote, or continue to hosted checkout.</p>
           <p className="mt-3 text-slate-400">By using the service, you confirm that you have read these terms and the Privacy Policy, that you are legally able to provide the requested information, and that the information you submit is accurate.</p>
         </LegalSection>
 
         <LegalSection number={2} title="Service Description" tone="blue">
-          <p>Tempify provides a digital journey for provider-verified vehicle lookup, quote information, account verification, and access to hosted payment. The website does not store full payment-card details.</p>
-          <div className="mt-4 rounded-xl border-l-2 border-amber-400 bg-amber-500/8 p-4 text-xs leading-5 text-slate-400">
-            <strong className="text-amber-300">Important service information:</strong> A quote, account, payment attempt or confirmation page does not by itself prove that insurance cover exists. Any cover remains subject to successful payment verification, eligibility checks, insurer or provider acceptance, and the applicable policy documents.
+          <p>Cuvvafy provides a digital journey for provider-verified vehicle lookup, quote information, account verification, and access to hosted payment. The website does not store full payment-card details.</p>
+          <div className="mt-4 rounded-xl border-l-2 border-violet-400 bg-violet-500/10 p-4 text-xs leading-5 text-slate-400">
+            <strong className="text-violet-300">Important service information:</strong> A quote, account, payment attempt or confirmation page does not by itself prove that insurance cover exists. Any cover remains subject to successful payment verification, eligibility checks, insurer or provider acceptance, and the applicable policy documents.
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <LegalInfoCard icon={CarFront} title="Verified Vehicle Lookup" tone="blue">Vehicle details come from an external provider or a cache backed by the original verified provider payload.</LegalInfoCard>
@@ -82,12 +82,12 @@ export default function TermsPage() {
         </LegalSection>
 
         <LegalSection number={6} title="Liability and Changes" tone="slate">
-          <p>Nothing in these terms excludes liability that cannot legally be excluded. To the extent permitted by law, Tempify is not responsible for losses caused by inaccurate information you provide, failures outside our reasonable control, or separate services supplied by third-party providers.</p>
+          <p>Nothing in these terms excludes liability that cannot legally be excluded. To the extent permitted by law, Cuvvafy is not responsible for losses caused by inaccurate information you provide, failures outside our reasonable control, or separate services supplied by third-party providers.</p>
           <div className="mt-4 flex items-start gap-3 rounded-xl border border-slate-500/25 bg-slate-500/8 p-4"><Scale size={18} className="mt-1 shrink-0 text-slate-300" /><p className="text-xs leading-5 text-slate-400">We may update these terms to reflect service, legal, security or provider changes. The updated date shown at the top identifies the current version.</p></div>
         </LegalSection>
 
         <LegalSection number={7} title="Contact Us">
-          <div className="flex items-start gap-3"><MessageSquareText className="mt-1 shrink-0 text-orange-400" size={19} /><p>If you have a question about these terms or the Tempify service, send it through our contact form. Never include passwords, one-time codes or full card details.</p></div>
+          <div className="flex items-start gap-3"><MessageSquareText className="mt-1 shrink-0 text-violet-400" size={19} /><p>If you have a question about these terms or the Cuvvafy service, send it through our contact form. Never include passwords, one-time codes or full card details.</p></div>
           <Link href="/contact?subject=Terms%20of%20Service%20question#contact-form" className="btn-primary mt-5">Contact Us</Link>
         </LegalSection>
       </div>

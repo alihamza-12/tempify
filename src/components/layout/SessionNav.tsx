@@ -57,8 +57,8 @@ export function SessionNav() {
   }
 
   return (
-    <Link href="/account" className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white hover:border-orange-500/40">
-      <UserRound size={16} className="text-orange-400" />
+    <Link href="/account" className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm font-bold text-white hover:border-violet-500/40">
+      <UserRound size={16} className="text-violet-400" />
       <span className="hidden max-w-28 truncate sm:block">{user.fullName.split(" ")[0]}</span>
     </Link>
   );

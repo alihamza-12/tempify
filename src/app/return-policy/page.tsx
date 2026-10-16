@@ -20,7 +20,7 @@ import { DotList, LegalHeroCard, LegalInfoCard, LegalPageShell, LegalSection } f
 
 export const metadata: Metadata = {
   title: "Return Policy",
-  description: "Tempify refund eligibility, cancellation information and support process.",
+  description: "Cuvvafy refund eligibility, cancellation information and support process.",
 };
 
 const supportHref = "/contact?subject=Refund%20request&source=return-policy#contact-form";
@@ -36,14 +36,14 @@ export default function ReturnPolicyPage() {
       <LegalHeroCard icon={ShieldCheck} title="Return Policy" subtitle="Understanding your refund and cancellation rights" />
 
       <p className="my-6 text-sm leading-7 text-slate-400">
-        This policy explains how refund and cancellation requests are handled for Tempify quotes, payments and related vehicle-cover services. Any insurance eligibility or cover decision remains subject to the applicable provider&apos;s terms.
+        This policy explains how refund and cancellation requests are handled for Cuvvafy quotes, payments and related vehicle-cover services. Any insurance eligibility or cover decision remains subject to the applicable provider&apos;s terms.
       </p>
 
       <div className="space-y-4">
         <LegalSection number={1} title="Policy Overview">
           <p>We review refund requests fairly and in accordance with applicable UK consumer law, the status of the requested cover, and the rules of the payment method used.</p>
-          <div className="mt-4 rounded-xl border-l-2 border-amber-400 bg-amber-500/8 p-4">
-            <div className="flex items-center gap-2 font-extrabold text-amber-300"><TriangleAlert size={16} /> Important notice</div>
+          <div className="mt-4 rounded-xl border-l-2 border-violet-400 bg-violet-500/10 p-4">
+            <div className="flex items-center gap-2 font-extrabold text-violet-300"><TriangleAlert size={16} /> Important notice</div>
             <p className="mt-2 text-xs leading-5 text-slate-400">Submitting a request does not automatically guarantee a refund. We first check whether payment settled, whether the service or cover period started, and whether any provider costs have already been incurred.</p>
           </div>
         </LegalSection>
@@ -77,9 +77,9 @@ export default function ReturnPolicyPage() {
         <LegalSection number={4} title="How to Request a Refund">
           <div className="grid gap-3 sm:grid-cols-3">
             {refundSteps.map(({ icon: Icon, title, text }) => (
-              <div key={title} className="rounded-xl border border-orange-500/25 bg-orange-950/15 p-4 text-center">
-                <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg shadow-orange-500/25"><Icon size={18} /></span>
-                <h3 className="mt-3 text-sm font-extrabold text-orange-200">{title}</h3>
+              <div key={title} className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-4 text-center">
+                <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white shadow-lg shadow-violet-600/25"><Icon size={18} /></span>
+                <h3 className="mt-3 text-sm font-extrabold text-violet-200">{title}</h3>
                 <p className="mt-2 text-xs leading-5 text-slate-400">{text}</p>
               </div>
             ))}
@@ -100,7 +100,7 @@ export default function ReturnPolicyPage() {
           <p>Payments and refunds are processed through third-party payment providers. Approved refunds are normally sent back through the original payment method.</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <LegalInfoCard icon={CirclePoundSterling} title="Original Payment Method" tone="purple">Provider processing times and banking delays can affect when funds appear.</LegalInfoCard>
-            <LegalInfoCard icon={Banknote} title="Currency and Fees" tone="purple">Exchange-rate differences or external fees may be outside Tempify&apos;s control.</LegalInfoCard>
+            <LegalInfoCard icon={Banknote} title="Currency and Fees" tone="purple">Exchange-rate differences or external fees may be outside Cuvvafy&apos;s control.</LegalInfoCard>
           </div>
         </LegalSection>
 
@@ -110,7 +110,7 @@ export default function ReturnPolicyPage() {
         </LegalSection>
 
         <LegalSection number={8} title="Contact Information">
-          <div className="flex items-start gap-3"><MessageSquareText className="mt-1 shrink-0 text-orange-400" size={19} /><p>For refund requests or questions about this policy, use our secure contact form. We aim to acknowledge enquiries promptly.</p></div>
+          <div className="flex items-start gap-3"><MessageSquareText className="mt-1 shrink-0 text-violet-400" size={19} /><p>For refund requests or questions about this policy, use our secure contact form. We aim to acknowledge enquiries promptly.</p></div>
           <Link href={supportHref} className="btn-primary mt-5 w-full">Contact Support for Refund Request</Link>
         </LegalSection>
       </div>

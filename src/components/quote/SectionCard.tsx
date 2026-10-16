@@ -3,16 +3,17 @@ import type { LucideIcon } from "lucide-react";
 export function SectionCard({
   icon: Icon,
   title,
-  accent = "orange",
+  accent = "violet",
   children,
 }: {
   icon: LucideIcon;
   title: string;
-  accent?: "orange" | "purple" | "emerald";
+  accent?: "violet" | "orange" | "purple" | "emerald";
   children: React.ReactNode;
 }) {
   const colors = {
-    orange: "bg-orange-500/15 text-orange-400",
+    violet: "bg-violet-500/15 text-violet-400",
+    orange: "bg-violet-500/15 text-violet-400",
     purple: "bg-purple-500/15 text-purple-400",
     emerald: "bg-emerald-500/15 text-emerald-400",
   };

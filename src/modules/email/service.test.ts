@@ -33,7 +33,7 @@ describe("contact email delivery", () => {
   beforeEach(() => {
     process.env.RESEND_API_KEY = "re_test";
     process.env.EMAIL_DELIVERY_MODE = "resend";
-    process.env.EMAIL_FROM = "Tempify <auto@cuvvapolicies.com>";
+    process.env.EMAIL_FROM = "Cuvvafy <auto@cuvvapolicies.com>";
     process.env.CONTACT_TO_EMAIL = "support@example.com";
     delete process.env.PAYMENT_EMAIL_FROM;
     batchSend.mockReset();
@@ -55,11 +55,11 @@ describe("contact email delivery", () => {
     expect(emails[0]).toMatchObject({
       to: ["support@example.com"],
       replyTo: "ava@example.com",
-      subject: "[Tempify support] Quote <question>",
+      subject: "[Cuvvafy support] Quote <question>",
     });
     expect(emails[1]).toMatchObject({
       to: ["ava@example.com"],
-      subject: "We received your Tempify message",
+      subject: "We received your Cuvvafy message",
     });
     expect(emails[1]).not.toHaveProperty("replyTo");
     expect(emails[0].html).toContain("Quote &lt;question&gt;");
@@ -114,7 +114,7 @@ describe("contact email delivery", () => {
     expect(payload.html).toContain("sample documents");
 
     const contactEmails = buildContactEmailBatch(input);
-    expect(contactEmails[0].from).toBe("Tempify <auto@cuvvapolicies.com>");
-    expect(contactEmails[1].from).toBe("Tempify <auto@cuvvapolicies.com>");
+    expect(contactEmails[0].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
+    expect(contactEmails[1].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
   });
 });

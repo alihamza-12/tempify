@@ -4,9 +4,9 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 
 export const metadata: Metadata = {
-  title: { default: "Tempify | Flexible vehicle cover", template: "%s | Tempify" },
+  title: { default: "Cuvvafy | Flexible vehicle cover", template: "%s | Cuvvafy" },
   description: "Search your vehicle, choose a flexible cover window and complete secure checkout in minutes.",
-  applicationName: "Tempify",
+  applicationName: "Cuvvafy",
   manifest: "/manifest.webmanifest",
   robots: { index: true, follow: true },
 };
@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#07080b",
+  themeColor: "#060812",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
