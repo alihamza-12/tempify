@@ -96,6 +96,9 @@ export async function completeRegistration(emailInput: string, code: string) {
     emailVerifiedAt: new Date(),
     authSource: "tempify",
   });
+  // Self-registered via Tempify - set createdBy to self so Cuvva dashboard shows Tempify origin instead of System Bootstrap / Unknown
+  user.createdBy = user._id;
+  await user.save();
 
   await VerificationToken.deleteOne({ _id: token._id });
   return { id: String(user._id), email: user.email, fullName: user.fullName, role: user.role };
