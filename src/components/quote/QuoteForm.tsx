@@ -13,6 +13,7 @@ import {
   MapPin,
   SlidersHorizontal,
   UserRound,
+  PoundSterling,
 } from "lucide-react";
 import { SectionCard } from "./SectionCard";
 import type { VehicleResult } from "@/modules/vehicles/types";
@@ -82,6 +83,20 @@ export function QuoteForm({ registration }: { registration: string }) {
   const [selectedModifications, setSelectedModifications] = useState<string[]>([]);
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Dynamic pricing from Cuvva super admin dashboard
+  const [dynamicDurationOptions, setDynamicDurationOptions] = useState<{ hours: number[]; days: number[]; weeks: number[] }>({
+    hours: [1, 3, 5, 12, 24],
+    days: [1, 2, 3, 4, 5, 6, 7],
+    weeks: [1, 2, 3, 4],
+  });
+  const [pricingPreview, setPricingPreview] = useState<null | {
+    amount: number;
+    category: "past" | "present" | "future";
+    fromDatabase: boolean;
+    currency: string;
+  }>(null);
+  const [loadingPricing, setLoadingPricing] = useState(false);
 
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<FormValues>({
     defaultValues: {
@@ -155,11 +170,66 @@ export function QuoteForm({ registration }: { registration: string }) {
       .finally(() => setLoadingVehicle(false));
   }, [registration]);
 
+  // Fetch dynamic duration options from Cuvva super admin pricing config
+  useEffect(() => {
+    fetch("/api/pricing", { cache: "no-store" })
+      .then(async (res) => {
+        const data = await res.json();
+        if (data?.durationOptions) {
+          setDynamicDurationOptions({
+            hours: data.durationOptions.hours?.length ? data.durationOptions.hours : [1, 3, 5, 12, 24],
+            days: data.durationOptions.days?.length ? data.durationOptions.days : [1, 2, 3, 4, 5, 6, 7],
+            weeks: data.durationOptions.weeks?.length ? data.durationOptions.weeks : [1, 2, 3, 4],
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const durationOptions = useMemo(() => {
-    if (durationUnit === "hours") return [1, 3, 5, 12, 24];
-    if (durationUnit === "days") return [1, 2, 3, 5, 7];
-    return [1, 2, 3, 4];
-  }, [durationUnit]);
+    return dynamicDurationOptions[durationUnit] || [1, 3, 5, 12, 24];
+  }, [durationUnit, dynamicDurationOptions]);
+
+  // Ensure selected durationValue exists in current options, if not pick first
+  useEffect(() => {
+    if (!durationOptions.includes(durationValue)) {
+      setDurationValue(durationOptions[0] || 1);
+    }
+  }, [durationOptions, durationValue]);
+
+  // Dynamic pricing preview - fetch from DB when duration or start time changes
+  useEffect(() => {
+    const startAt = startMode === "immediate" ? new Date() : new Date(scheduledStart);
+    if (Number.isNaN(startAt.getTime())) return;
+
+    setLoadingPricing(true);
+    const controller = new AbortController();
+    fetch("/api/pricing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        durationUnit,
+        durationValue,
+        startAt: startAt.toISOString(),
+      }),
+      signal: controller.signal,
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (data?.pricing) {
+          setPricingPreview({
+            amount: data.pricing.amount,
+            category: data.category || data.pricing.category || "present",
+            fromDatabase: data.pricing.fromDatabase ?? false,
+            currency: data.pricing.currency || "GBP",
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPricing(false));
+
+    return () => controller.abort();
+  }, [durationUnit, durationValue, startMode, scheduledStart]);
 
   async function submit(values: FormValues) {
     if (!vehicle) return;
@@ -245,7 +315,7 @@ export function QuoteForm({ registration }: { registration: string }) {
         <FieldLabel text="Duration type" />
         <div className="grid grid-cols-3 gap-2">
           {(["hours", "days", "weeks"] as const).map((unit) => (
-            <button key={unit} type="button" onClick={() => { setDurationUnit(unit); setDurationValue(1); }} className={`min-h-11 rounded-xl border text-sm font-bold capitalize transition ${durationUnit === unit ? "border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-600/20" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{unit}</button>
+            <button key={unit} type="button" onClick={() => { setDurationUnit(unit); }} className={`min-h-11 rounded-xl border text-sm font-bold capitalize transition ${durationUnit === unit ? "border-violet-500 bg-violet-600 text-white shadow-lg shadow-violet-600/20" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{unit}</button>
           ))}
         </div>
         <div className="mt-5">
@@ -253,12 +323,35 @@ export function QuoteForm({ registration }: { registration: string }) {
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {durationOptions.map((value) => <button key={value} type="button" onClick={() => setDurationValue(value)} className={`min-h-11 rounded-xl border text-sm font-bold transition ${durationValue === value ? "border-violet-500 bg-violet-500/15 text-violet-300" : "border-white/8 bg-[#1a2536] text-slate-400 hover:text-white"}`}>{value} {value === 1 ? durationUnit.slice(0, -1) : durationUnit}</button>)}
           </div>
+          <p className="mt-2 text-[10px] text-[#8a8fbc]">Options managed by super admin: {durationOptions.join(", ")} {durationUnit}</p>
         </div>
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           <label><FieldLabel text="Start option" /><select className="field" value={startMode} onChange={(event) => setStartMode(event.target.value as "immediate" | "scheduled")}><option value="immediate">Immediate start</option><option value="scheduled">Choose date & time</option></select></label>
           <label className={startMode === "immediate" ? "opacity-45" : ""}><FieldLabel text="Start date & time" /><input type="datetime-local" className="field" disabled={startMode === "immediate"} value={scheduledStart} onChange={(event) => setScheduledStart(event.target.value)} /></label>
         </div>
-        <p className="mt-4 text-xs text-slate-500">Previous dates and times can be selected. Past starts receive a higher price calculated securely on the server.</p>
+        <p className="mt-4 text-xs text-slate-500">Previous dates and times can be selected. Past starts receive a higher price calculated securely on the server. Pricing is dynamic from super admin database.</p>
+
+        {/* Dynamic Pricing Preview from Database */}
+        <div className="mt-6 rounded-2xl border border-violet-500/20 bg-gradient-to-br from-[#5e4bff]/10 to-[#8b5cf6]/10 p-4">
+          <div className="flex items-center gap-2 text-xs font-bold text-violet-300 uppercase tracking-wider">
+            <PoundSterling size={14} /> Total price preview
+            {pricingPreview?.category && <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${pricingPreview.category === "past" ? "bg-amber-500/15 text-amber-300" : pricingPreview.category === "future" ? "bg-blue-500/15 text-blue-300" : "bg-emerald-500/15 text-emerald-300"}`}>{pricingPreview.category}</span>}
+          </div>
+          <div className="mt-3">
+            {loadingPricing ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400"><LoaderCircle size={16} className="animate-spin" /> Calculating price from database...</div>
+            ) : pricingPreview ? (
+              <>
+                <div className="text-3xl font-black text-white">£{pricingPreview.amount.toFixed(2)}</div>
+                <div className="mt-1 text-[11px] text-slate-400">
+                  {pricingPreview.fromDatabase ? "✓ From super admin database" : "Fallback pricing"} • {durationValue} {durationUnit} • {pricingPreview.category} • {startMode === "immediate" ? "Immediate start" : new Date(scheduledStart).toLocaleString()}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-slate-500">Select duration to see price</div>
+            )}
+          </div>
+        </div>
       </SectionCard>
 
       <SectionCard icon={UserRound} title="Driver details">

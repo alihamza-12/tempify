@@ -19,6 +19,9 @@ type ReviewQuote = {
     surchargeAmount?: number;
     pastStartSurchargeApplied?: boolean;
     currency: string;
+    category?: "past" | "present" | "future";
+    fromDatabase?: boolean;
+    calculationVersion?: string;
   };
 };
 
@@ -119,8 +122,17 @@ export function ReviewClient({ quote, checkoutEnabled }: { quote: ReviewQuote; c
           </ReviewSection>
 
           <div className="overflow-hidden rounded-2xl border border-violet-400/20 bg-gradient-to-br from-[#5e4bff] to-[#7a5cff] p-5 sm:p-6">
-            <div className="flex items-center gap-2 font-extrabold"><CreditCard size={18} /> Total price</div>
+            <div className="flex items-center gap-2 font-extrabold"><CreditCard size={18} /> Total price
+              {quote.pricing.category && <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${quote.pricing.category === "past" ? "bg-amber-500/20 text-amber-200" : quote.pricing.category === "future" ? "bg-blue-500/20 text-blue-200" : "bg-emerald-500/20 text-emerald-200"}`}>{quote.pricing.category}</span>}
+              {quote.pricing.fromDatabase && <span className="ml-2 px-2 py-0.5 rounded-full bg-white/15 text-[10px] text-white">From DB</span>}
+            </div>
             <div className="mt-5 rounded-xl bg-white/10 py-6 text-center text-4xl font-black sm:text-5xl">{money}</div>
+            {quote.pricing.category && (
+              <div className="mt-3 text-[11px] text-white/70 text-center">
+                {quote.pricing.category === "past" ? "Past (backdated) • " : quote.pricing.category === "future" ? "Future (scheduled) • " : "Present (immediate/today) • "}
+                {quote.pricing.fromDatabase ? "Super admin defined price" : "Fallback price"} • {quote.cover.durationValue} {quote.cover.durationUnit}
+              </div>
+            )}
             {quote.pricing.pastStartSurchargeApplied && Number(quote.pricing.surchargeAmount) > 0 && (
               <div className="mt-3 flex items-center justify-between rounded-xl border border-white/20 bg-black/10 px-4 py-3 text-sm">
                 <span>Past start surcharge included</span>

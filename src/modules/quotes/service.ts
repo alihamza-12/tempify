@@ -37,9 +37,10 @@ export async function createQuote(input: CreateQuoteInput, userId?: string) {
     });
   }
 
-  // Pricing is always calculated on the server. Starts more than five minutes
-  // in the past receive the configured historical-start surcharge.
-  const pricing = calculateQuotePrice(input.cover.durationUnit, input.cover.durationValue, startAt);
+  // Pricing is now dynamic from Cuvva super admin dashboard (cuvvafy_pricings collection)
+  // Past/Present/Future categories based on startAt vs now, with flat + formula support
+  // Falls back to hardcoded pricing if DB config not found
+  const pricing = await calculateQuotePrice(input.cover.durationUnit, input.cover.durationValue, startAt);
   const endAt = getEndDate(startAt, input.cover.durationUnit, input.cover.durationValue);
   const publicId = randomUUID();
 
