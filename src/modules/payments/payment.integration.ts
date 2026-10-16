@@ -170,7 +170,7 @@ describe("isolated MongoDB + real application routes; external APIs intercepted"
   it("two simultaneous checkout requests cannot create two chargeable orders", async () => {
     const q = await quote();
     const results = await Promise.all([requestCheckout(q.publicId), requestCheckout(q.publicId)]);
-    expect(results.some((response) => response.status === 201)).toBe(true);
+    expect(results.some((response: Response) => response.status === 201)).toBe(true);
     expect(createCalls).toBe(1);
     expect(await Order.countDocuments({ quoteId: q._id })).toBe(1);
   });

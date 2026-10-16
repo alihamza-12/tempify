@@ -8,6 +8,8 @@ The user confirmed applying `tempify-payment-email-updated-files.zip`, then spec
 
 **Repeat verification:** the 14-scenario integration suite was run three more times in independent test processes with fresh isolated databases: **14/14, 14/14, 14/14 passed**. Then 74/74 unit tests, typecheck, lint, production build and zero-vulnerability production audit passed again. There are 88 distinct automated tests, not 116 distinct tests. No new defect appeared in these repetitions. This establishes repeatable simulated behavior, not real financial settlement.
 
+**CI type-check fix (15 Oct 2026):** GitHub Actions `tsc --noEmit` failed with `TS2307: Cannot find module '@/app/api/checkout/route'` and `TS7006: Parameter 'response' implicitly has an 'any' type`. Root cause was missing `baseUrl` in `tsconfig.json`, making the `@/*` alias unreliable in CI, which then caused the `response` param to be inferred as `any`. Fixed by adding `"baseUrl": "."` to `tsconfig.json` and explicitly typing the callback in `payment.integration.ts`. Local `npm ci && npm run typecheck && npm run lint && npm test && npm run test:payment:integration && npm run build` now passes cleanly, matching CI steps.
+
 ## Problems reproduced and fixed
 
 The initial integration run had seven failures: six genuine application defects and one incorrect test assertion (`contentType` versus Resend's serialized `content_type`). That assertion was corrected; it was NOT an application defect involving missing attachments.
