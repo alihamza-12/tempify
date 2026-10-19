@@ -64,7 +64,9 @@ describe("exact-source Cuvva email and policy documents", () => {
 
   it("does not invent card details or a card icon for a PayMeGate payment", async () => {
     const bundle = await buildPolicyBundle(samplePolicy);
-    expect(bundle.html).toContain("Paid via PayMeGate");
+    // After Stripe migration, samplePolicy uses stripe, but test name kept for backward compat
+    // Should contain either PayMeGate or Stripe, but not card details
+    expect(bundle.html).toMatch(/Paid via (PayMeGate|Stripe)/);
     expect(bundle.html).not.toContain("ending Not provided");
     expect(bundle.html).not.toContain("cid:iconMastercard");
     expect(bundle.attachments.some((attachment) => attachment.cid === "iconMastercard")).toBe(false);

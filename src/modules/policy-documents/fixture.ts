@@ -31,5 +31,5 @@ export const samplePolicy: PolicyDocumentInput = {
     colour: "Blue",
     year: 2020,
   },
-  payment: { method: "paymegate" },
+  payment: { method: "stripe" },
 };

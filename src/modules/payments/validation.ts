@@ -7,7 +7,8 @@ export const paidPaymentSchema = z.object({
   eventId: identifier,
   orderUUID: identifier,
   // Provider-settled events carry this UUID; manually forced paid events do not.
-  transactionUUID: z.uuid(),
+  // For Stripe: payment_intent ID or session ID
+  transactionUUID: z.string().min(1).max(200),
   transactionRef: z.string().max(500).nullable().optional(),
   paidAt: z.iso.datetime({ offset: true }).optional(),
   amount: z.string().min(1).max(100),
@@ -19,6 +20,8 @@ export type PaidPayment = z.infer<typeof paidPaymentSchema>;
 type StoredPayment = {
   publicId: string;
   paymegateOrderUUID?: string | null;
+  stripeSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
   amount: number;
   currency: string;
 };
@@ -36,14 +39,27 @@ export function matchesStoredPayment(
   order: StoredPayment,
   payment: { externalId: unknown; orderUUID: unknown; amount: unknown; currency: unknown },
 ): boolean {
+  // Support both Stripe (stripeSessionId) and legacy PayMeGate (paymegateOrderUUID)
+  const hasStripeId = Boolean(order.stripeSessionId);
+  const hasPayMeGateId = Boolean(order.paymegateOrderUUID);
+  
+  if (!hasStripeId && !hasPayMeGateId) return false;
+
+  // Check Stripe session ID match
+  if (hasStripeId) {
+    if (payment.orderUUID !== order.stripeSessionId) return false;
+  } else if (hasPayMeGateId) {
+    // Legacy PayMeGate check
+    if (payment.orderUUID !== order.paymegateOrderUUID) return false;
+  }
+
   if (
-    !order.paymegateOrderUUID ||
-    payment.orderUUID !== order.paymegateOrderUUID ||
     payment.externalId !== order.publicId ||
     order.currency !== "GBP" ||
     payment.currency !== order.currency ||
     typeof payment.amount !== "string"
-  ) return false;
+  )
+    return false;
 
   const expected = gbpPence(order.amount);
   return expected !== null && gbpPence(payment.amount) === expected;

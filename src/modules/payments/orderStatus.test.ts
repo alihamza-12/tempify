@@ -14,7 +14,8 @@ vi.mock("@/lib/db", () => ({ connectToDatabase: mocks.connect }));
 vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/models/Order", () => ({ Order: { findOne: mocks.findOne, updateOne: mocks.updateOne } }));
 vi.mock("@/modules/payments/fulfillment", () => ({ markOrderPaid: mocks.markPaid, sendPaidOrderEmail: mocks.sendPaidEmail }));
-vi.mock("@/modules/payments/paymegate", () => ({
+vi.mock("@/modules/payments/stripe", () => ({
+  getStripeSession: mocks.remote,
   getPayMeGateOrder: mocks.remote,
   mapPaymentStatus: (status: string) => status.toLowerCase(),
 }));
@@ -23,14 +24,17 @@ import { GET } from "../../app/api/orders/[id]/route";
 
 const initial = {
   _id: "database-order", publicId: "local-order", userId: "customer-1",
-  paymegateOrderUUID: "provider-order", amount: 12.34, currency: "GBP",
+  stripeSessionId: "provider-order", paymegateOrderUUID: "provider-order", amount: 12.34, currency: "GBP",
   status: "unpaid", paidAt: null, policyId: null,
   fulfillmentStatus: "pending_payment", confirmationEmailStatus: "pending",
 };
 const remote = {
+  sessionId: "provider-order",
+  paymentIntentId: "30569045-9e69-41cb-9083-8ac5e3d76a5e",
   paidTransactionUUID: "30569045-9e69-41cb-9083-8ac5e3d76a5e",
   externalId: "local-order", orderUUID: "provider-order", amount: "12.34",
   currency: "GBP", status: "PAID", paidAt: "2026-10-14T12:00:00Z",
+  metadata: { externalId: "local-order" },
 };
 const call = () => GET(new Request("https://example.test/api/orders/local-order"), { params: Promise.resolve({ id: "local-order" }) });
 const reads = (...values: unknown[]) => values.forEach((value) => mocks.findOne.mockReturnValueOnce({ lean: vi.fn().mockResolvedValue(value) }));
@@ -38,6 +42,7 @@ const reads = (...values: unknown[]) => values.forEach((value) => mocks.findOne.
 describe("order status uses persisted, validated payment state", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_only");
     vi.stubEnv("PAYMEGATE_API_KEY", "test-only");
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.session.mockResolvedValue({ userId: "customer-1" });

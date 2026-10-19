@@ -56,7 +56,7 @@ beforeEach(() => {
   order = {
     _id: "db-order", publicId: "order-1", userId: "test-user", quoteId: "quote-1",
     customerEmail: samplePolicy.customer.email, amount: 25, currency: "GBP",
-    paymegateOrderUUID: "provider-1", status: "unpaid", processedEventIds: [],
+    stripeSessionId: "provider-1", paymegateOrderUUID: "provider-1", status: "unpaid", processedEventIds: [],
     confirmationEmailStatus: "pending", confirmationEmailAttempts: 0,
     documentSnapshot: { ...samplePolicy, policy: { ...samplePolicy.policy, _id: "order-1" } },
   };

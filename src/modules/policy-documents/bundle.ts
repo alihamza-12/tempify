@@ -80,7 +80,7 @@ export function emailDataForPolicy(input: PolicyDocumentInput): EmailData {
     endDateStr: emailDate(policy.endDate, policy.endTime),
     duration,
     price: policy.premiumAmount.toFixed(2),
-    cardBrand: payment.method === "card" ? payment.brand : "PayMeGate",
+    cardBrand: payment.method === "card" ? payment.brand : payment.method === "stripe" ? "Stripe" : "PayMeGate",
     cardLast4: payment.method === "card" ? payment.last4 : "",
     policyNumber: policy.policyNumber,
     underwriter: policy.underwriter,
@@ -96,10 +96,18 @@ export async function buildPolicyBundle(rawInput: unknown): Promise<PolicyBundle
   // not its markup, so customer-controlled text cannot inject HTML into email.
   const escaped = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, escapeHtml(value)]));
   let html = sourceEmail.buildPolicyEmailHtml(escaped);
-  if (input.payment.method === "paymegate") {
-    // Preserve the original layout but never pretend a crypto payment used a card.
+  if (input.payment.method === "paymegate" || input.payment.method === "stripe") {
+    // Preserve the original layout but never pretend a crypto/Stripe payment used a card.
     html = html.replace(/<td style="padding-right:8px;">\s*<img src="cid:iconMastercard"[^>]*\/>\s*<\/td>/, "");
-    html = html.replace("Paid with PayMeGate ending Not provided", "Paid via PayMeGate");
+    if (input.payment.method === "paymegate") {
+      html = html.replace("Paid with PayMeGate ending Not provided", "Paid via PayMeGate");
+      html = html.replace("Paid with Stripe ending Not provided", "Paid via PayMeGate");
+    } else {
+      html = html.replace("Paid with PayMeGate ending Not provided", "Paid via Stripe");
+      html = html.replace("Paid with Stripe ending Not provided", "Paid via Stripe");
+      html = html.replace("Paid via PayMeGate", "Paid via Stripe");
+      html = html.replace("Paid with Stripe ending", "Paid via Stripe");
+    }
   }
   const dynamicPdf = await sourcePdf.generatePolicyCertificatePdf(input);
   const attachments: PolicyAttachment[] = [

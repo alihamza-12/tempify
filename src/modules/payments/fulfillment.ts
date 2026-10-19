@@ -20,11 +20,36 @@ export async function markOrderPaid(payload: unknown) {
   }
 
   // Atomic transition: concurrent requests cannot reset paidAt or email state.
+  // Support both Stripe (stripeSessionId) and legacy PayMeGate (paymegateOrderUUID)
+  const filter: Record<string, unknown> = {
+    _id: order._id,
+    status: { $ne: "paid" },
+    amount: order.amount,
+    currency: input.currency,
+  };
+  
+  // Check which payment provider ID to use
+  if (order.stripeSessionId) {
+    filter.stripeSessionId = input.orderUUID;
+  } else if (order.paymegateOrderUUID) {
+    filter.paymegateOrderUUID = input.orderUUID;
+  } else {
+    // Fallback: try both
+    filter.$or = [
+      { stripeSessionId: input.orderUUID },
+      { paymegateOrderUUID: input.orderUUID },
+    ];
+    delete filter.stripeSessionId;
+    delete filter.paymegateOrderUUID;
+  }
+
   const changed = await Order.findOneAndUpdate(
-    { _id: order._id, status: { $ne: "paid" }, paymegateOrderUUID: input.orderUUID, amount: order.amount, currency: input.currency },
+    filter,
     {
       $set: {
-        status: "paid", transactionUUID: input.transactionUUID,
+        status: "paid",
+        transactionUUID: input.transactionUUID,
+        stripePaymentIntentId: input.transactionUUID,
         transactionRef: input.transactionRef || undefined,
         paidAt: input.paidAt ? new Date(input.paidAt) : new Date(),
         fulfillmentStatus: "blocked_pending_authority",
@@ -57,27 +82,36 @@ export async function sendPaidOrderEmail(orderId: string) {
   const claim = randomUUID();
   const claimed = await Order.findOneAndUpdate(
     {
-      _id: orderId, status: "paid",
+      _id: orderId,
+      status: "paid",
       $and: [
-        { $or: [
-          { confirmationEmailStatus: { $in: ["pending", "failed"] }, $or: [
-            { confirmationEmailNextRetryAt: { $exists: false } },
-            { confirmationEmailNextRetryAt: null },
-            { confirmationEmailNextRetryAt: { $lte: now } },
-          ] },
-          { confirmationEmailStatus: "sending", confirmationEmailClaimedAt: { $lte: new Date(now.getTime() - EMAIL_LEASE_MS) } },
-        ] },
-        { $or: [ { confirmationEmailAttempts: { $exists: false } }, { confirmationEmailAttempts: { $lt: EMAIL_MAX_ATTEMPTS } } ] },
-        { $or: [
-          { confirmationEmailFirstAttemptAt: { $exists: false } },
-          { confirmationEmailFirstAttemptAt: null },
-          { confirmationEmailFirstAttemptAt: { $gt: new Date(now.getTime() - EMAIL_RETRY_WINDOW_MS) } },
-        ] },
+        {
+          $or: [
+            {
+              confirmationEmailStatus: { $in: ["pending", "failed"] },
+              $or: [
+                { confirmationEmailNextRetryAt: { $exists: false } },
+                { confirmationEmailNextRetryAt: null },
+                { confirmationEmailNextRetryAt: { $lte: now } },
+              ],
+            },
+            { confirmationEmailStatus: "sending", confirmationEmailClaimedAt: { $lte: new Date(now.getTime() - EMAIL_LEASE_MS) } },
+          ],
+        },
+        { $or: [{ confirmationEmailAttempts: { $exists: false } }, { confirmationEmailAttempts: { $lt: EMAIL_MAX_ATTEMPTS } }] },
+        {
+          $or: [
+            { confirmationEmailFirstAttemptAt: { $exists: false } },
+            { confirmationEmailFirstAttemptAt: null },
+            { confirmationEmailFirstAttemptAt: { $gt: new Date(now.getTime() - EMAIL_RETRY_WINDOW_MS) } },
+          ],
+        },
       ],
     },
     {
       $set: {
-        confirmationEmailStatus: "sending", confirmationEmailClaim: claim,
+        confirmationEmailStatus: "sending",
+        confirmationEmailClaim: claim,
         confirmationEmailClaimedAt: now,
         confirmationEmailFirstAttemptAt: current.confirmationEmailFirstAttemptAt || now,
         confirmationEmailError: null,
@@ -99,8 +133,11 @@ export async function sendPaidOrderEmail(orderId: string) {
         snapshot = sampleDocumentInputFromQuote(quote, claimed);
       }
       payload = await preparePaymentDocumentEmail({
-        orderId: claimed.publicId, email: claimed.customerEmail,
-        amount: claimed.amount, currency: claimed.currency, documentSnapshot: snapshot,
+        orderId: claimed.publicId,
+        email: claimed.customerEmail,
+        amount: claimed.amount,
+        currency: claimed.currency,
+        documentSnapshot: snapshot,
       });
       const saved = await Order.updateOne(ownedClaim, { $set: { documentSnapshot: snapshot, confirmationEmailPayload: payload } });
       if (!saved.matchedCount) return { state: "pending", retryable: true };

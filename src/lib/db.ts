@@ -20,7 +20,7 @@ globalWithMongoose.mongooseCache = cache;
  * One shared MongoDB database for Cuvva and Tempify. Equivalent business data
  * uses the existing Cuvva collections (`users`, `vehicles`, and, only after
  * authorised issuance, `policies`). Tempify-only workflow state such as OTPs,
- * quotes and PayMeGate orders may use support collections in the same database.
+ * quotes and Stripe orders may use support collections in the same database.
  */
 export async function connectToDatabase() {
   if (cache.conn) return cache.conn;

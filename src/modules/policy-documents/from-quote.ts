@@ -51,6 +51,6 @@ export function sampleDocumentInputFromQuote(rawQuote: unknown, order: PaymentOr
       address: { ...quote.address, country: quote.address.country || "GB" },
     },
     vehicle: { ...quote.vehicle, colour: quote.vehicle.colour || "Not provided" },
-    payment: { method: "paymegate" },
+    payment: { method: "stripe" },
   });
 }

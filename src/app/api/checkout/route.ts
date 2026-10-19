@@ -8,7 +8,7 @@ import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
-import { createPayMeGateOrder } from "@/modules/payments/paymegate";
+import { createStripeCheckoutSession } from "@/modules/payments/stripe";
 import { customerProfileSchema } from "@/modules/profile/schema";
 import { saveCustomerProfile } from "@/modules/profile/service";
 
@@ -110,7 +110,10 @@ export async function POST(request: Request) {
     const publicId = randomUUID();
     // Validate the snapshot before locking the quote or calling the provider.
     const documentSnapshot = sampleDocumentInputFromQuote(quote, {
-      publicId, customerEmail: user.email, amount: quote.pricing.amount, currency: quote.pricing.currency,
+      publicId,
+      customerEmail: user.email,
+      amount: quote.pricing.amount,
+      currency: quote.pricing.currency,
     });
     const claimedQuote = await Quote.findOneAndUpdate(
       { _id: quote._id, status: "draft", expiresAt: { $gt: new Date() } },
@@ -132,16 +135,18 @@ export async function POST(request: Request) {
     });
 
     try {
-      const remote = await createPayMeGateOrder({
+      const remote = await createStripeCheckoutSession({
         externalId: publicId,
         amount: Number(quote.pricing.amount).toFixed(2),
         currency: quote.pricing.currency,
-        backUrl: `${appUrl.replace(/\/$/, "")}/order/${publicId}`,
+        successUrl: `${appUrl.replace(/\/$/, "")}/order/${publicId}`,
+        cancelUrl: `${appUrl.replace(/\/$/, "")}/review?id=${quote.publicId}`,
         email: quote.driver.email,
         fullName: `${quote.driver.firstName} ${quote.driver.lastName}`.trim(),
         metadata: { quoteId: quote.publicId, registration: quote.vehicle.registration },
       });
-      order.paymegateOrderUUID = remote.orderUUID;
+      order.stripeSessionId = remote.sessionId;
+      order.paymegateOrderUUID = remote.sessionId; // Keep for backward compat with old validation
       order.checkoutUrl = remote.checkoutUrl;
       order.checkoutCreationStatus = "ready";
       await order.save();

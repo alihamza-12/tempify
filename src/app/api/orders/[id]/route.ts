@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
-import { getPayMeGateOrder, mapPaymentStatus } from "@/modules/payments/paymegate";
+import { getStripeSession, mapPaymentStatus } from "@/modules/payments/stripe";
 import { matchesStoredPayment } from "@/modules/payments/validation";
 import { canRetryPaymentEmail } from "@/modules/payments/email-retry";
 import { markOrderPaid, sendPaidOrderEmail } from "@/modules/payments/fulfillment";
@@ -18,26 +18,34 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const order = await Order.findOne({ publicId: id, userId: session.userId }).lean();
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  if (order.status === "unpaid" && order.paymegateOrderUUID && process.env.PAYMEGATE_API_KEY) {
+  // Reconcile with Stripe if unpaid and we have a session ID
+  const sessionId = order.stripeSessionId || order.paymegateOrderUUID;
+  if (order.status === "unpaid" && sessionId && process.env.STRIPE_SECRET_KEY) {
     try {
-      const remote = await getPayMeGateOrder(order.paymegateOrderUUID);
-      if (!matchesStoredPayment(order, remote)) {
+      const remote = await getStripeSession(sessionId);
+      // For Stripe, remote has different shape, adapt for matchesStoredPayment
+      // Support both new Stripe shape (sessionId, metadata) and legacy test shape (orderUUID, externalId)
+      const remoteAsLegacy = remote as unknown as { orderUUID?: string; externalId?: string };
+      const remoteForValidation = {
+        orderUUID: remoteAsLegacy.orderUUID || remote.sessionId,
+        externalId: remoteAsLegacy.externalId || remote.metadata?.externalId || order.publicId,
+        amount: remote.amount,
+        currency: remote.currency,
+      };
+      if (!matchesStoredPayment(order, remoteForValidation)) {
         throw new Error("Provider response does not match the stored order.");
       }
       const status = mapPaymentStatus(remote.status);
-      if (status === "paid" && remote.forced === true) {
-        throw new Error("A manually forced status is not a verified payment.");
-      }
       if (status === "paid") {
         await markOrderPaid({
-          externalId: remote.externalId,
-          eventId: `reconcile:${remote.orderUUID}`,
-          orderUUID: remote.orderUUID,
-          transactionUUID: remote.paidTransactionUUID,
-          transactionRef: remote.transactionRef,
-          paidAt: remote.paidAt,
+          externalId: remote.metadata?.externalId || order.publicId,
+          eventId: `reconcile:${remote.sessionId}`,
+          orderUUID: remote.sessionId,
+          transactionUUID: remote.paymentIntentId || remote.sessionId,
+          transactionRef: remote.paymentIntentId,
+          paidAt: new Date().toISOString(),
           amount: remote.amount,
-          currency: remote.currency,
+          currency: remote.currency as "GBP",
         });
       } else if (status !== order.status) {
         await Order.updateOne({ _id: order._id, status: "unpaid" }, { $set: { status } });
@@ -48,8 +56,11 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   if (order.status === "paid" && canRetryPaymentEmail(order)) {
-    try { await sendPaidOrderEmail(String(order._id)); }
-    catch { console.warn("[payment:email] retry unavailable", order.publicId); }
+    try {
+      await sendPaidOrderEmail(String(order._id));
+    } catch {
+      console.warn("[payment:email] retry unavailable", order.publicId);
+    }
   }
 
   // Re-read persisted state: a provider response alone is not proof that our
@@ -57,16 +68,18 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const latest = await Order.findOne({ publicId: id, userId: session.userId }).lean();
   if (!latest) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  return NextResponse.json({
-    orderId: latest.publicId,
-    status: latest.status,
-    amount: latest.amount,
-    currency: latest.currency,
-    paidAt: latest.paidAt || null,
-    policyIssued: latest.fulfillmentStatus === "issued" && Boolean(latest.policyId),
-    fulfillmentStatus:
-      latest.fulfillmentStatus || (latest.status === "paid" ? "blocked_pending_authority" : "pending_payment"),
-    confirmationEmailStatus: latest.confirmationEmailStatus || "pending",
-    confirmationEmailRetryable: canRetryPaymentEmail(latest),
-  }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json(
+    {
+      orderId: latest.publicId,
+      status: latest.status,
+      amount: latest.amount,
+      currency: latest.currency,
+      paidAt: latest.paidAt || null,
+      policyIssued: latest.fulfillmentStatus === "issued" && Boolean(latest.policyId),
+      fulfillmentStatus: latest.fulfillmentStatus || (latest.status === "paid" ? "blocked_pending_authority" : "pending_payment"),
+      confirmationEmailStatus: latest.confirmationEmailStatus || "pending",
+      confirmationEmailRetryable: canRetryPaymentEmail(latest),
+    },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }

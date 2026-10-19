@@ -48,6 +48,7 @@ export const policyDocumentSchema = z.object({
   payment: z.discriminatedUnion("method", [
     z.object({ method: z.literal("card"), brand: text, last4: z.string().regex(/^\d{4}$/) }),
     z.object({ method: z.literal("paymegate") }),
+    z.object({ method: z.literal("stripe") }),
   ]),
 }).superRefine((data, ctx) => {
   const start = Date.parse(`${data.policy.startDate}T${data.policy.startTime}:00Z`);

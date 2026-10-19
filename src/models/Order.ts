@@ -14,7 +14,12 @@ const orderSchema = new Schema(
       default: "unpaid",
       index: true,
     },
-    paymegateOrderUUID: String,
+    // Stripe integration (primary)
+    stripeSessionId: { type: String, index: true },
+    stripePaymentIntentId: String,
+    stripeCustomerId: String,
+    // Legacy PayMeGate (kept for backward compatibility with old orders)
+    paymegateOrderUUID: { type: String, index: true },
     checkoutUrl: String,
     checkoutCreationStatus: { type: String, enum: ["creating", "ready", "review_required"], default: "creating" },
     transactionUUID: String,
@@ -47,6 +52,7 @@ const orderSchema = new Schema(
   { timestamps: true, collection: "tempify_orders" },
 );
 
+orderSchema.index({ stripeSessionId: 1 }, { sparse: true });
 orderSchema.index({ paymegateOrderUUID: 1 }, { sparse: true });
 
 export const Order = models.Order || model("Order", orderSchema);

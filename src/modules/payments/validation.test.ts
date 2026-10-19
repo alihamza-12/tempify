@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { gbpPence, matchesStoredPayment, paidPaymentSchema } from "./validation";
 
-const order = { publicId: "local-order", paymegateOrderUUID: "provider-order", amount: 12.34, currency: "GBP" };
+const order = { publicId: "local-order", stripeSessionId: "provider-order", paymegateOrderUUID: "provider-order", amount: 12.34, currency: "GBP" };
 const payment = { transactionUUID: "30569045-9e69-41cb-9083-8ac5e3d76a5e", externalId: "local-order", orderUUID: "provider-order", amount: "12.34", currency: "GBP" };
 
 describe("payment identity and exact GBP amount", () => {
@@ -13,7 +13,7 @@ describe("payment identity and exact GBP amount", () => {
   });
   it("does not replace a stored provider identity", () => {
     expect(matchesStoredPayment(order, { ...payment, orderUUID: "other" })).toBe(false);
-    expect(matchesStoredPayment({ ...order, paymegateOrderUUID: null }, payment)).toBe(false);
+    expect(matchesStoredPayment({ ...order, stripeSessionId: null, paymegateOrderUUID: null }, payment)).toBe(false);
     expect(matchesStoredPayment(order, { ...payment, externalId: "another-customer" })).toBe(false);
   });
   it("rejects other currencies and invalid stored amounts", () => {
@@ -33,5 +33,10 @@ describe("payment identity and exact GBP amount", () => {
     expect(paidPaymentSchema.safeParse({ ...payment, eventId: "" }).success).toBe(false);
     expect(paidPaymentSchema.safeParse({ ...payment, eventId: "event-1", paidAt: "invalid" }).success).toBe(false);
     expect(paidPaymentSchema.safeParse({ ...payment, eventId: "event-1", paidAt: "2026-10-14T12:00:00Z" }).success).toBe(true);
+  });
+  it("supports Stripe session ID", () => {
+    const stripeOrder = { publicId: "local-order", stripeSessionId: "cs_test_123", amount: 12.34, currency: "GBP" };
+    const stripePayment = { ...payment, orderUUID: "cs_test_123" };
+    expect(matchesStoredPayment(stripeOrder, stripePayment)).toBe(true);
   });
 });
