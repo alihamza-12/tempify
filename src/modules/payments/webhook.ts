@@ -41,7 +41,7 @@ export function verifyStripeWebhook(input: {
   try {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY?.trim() || "", {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiVersion: "2025-02-24.acacia" as any,
+      apiVersion: "2025-09-30.clover" as any,
     });
     const event = stripe.webhooks.constructEvent(input.rawBody, input.signature, webhookSecret);
     return { valid: true, event, error: null };
@@ -62,7 +62,7 @@ export function constructStripeEvent(rawBody: string, signature: string | null):
   }
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY?.trim() || "", {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    apiVersion: "2025-02-24.acacia" as any,
+    apiVersion: "2025-09-30.clover" as any,
   });
   return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
 }

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const stripe = new Stripe(secretKey, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiVersion: "2025-02-24.acacia" as any,
+      apiVersion: "2025-09-30.clover" as any,
     });
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (error) {

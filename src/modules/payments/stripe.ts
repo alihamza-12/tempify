@@ -12,7 +12,7 @@ function getStripe(): Stripe {
   if (!stripeInstance) {
     stripeInstance = new Stripe(secretKey, {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      apiVersion: "2025-02-24.acacia" as any,
+      apiVersion: "2025-09-30.clover" as any,
       typescript: true,
     });
   }
@@ -64,6 +64,10 @@ export async function createStripeCheckoutSession(input: {
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       payment_method_types: ["card"],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      branding_settings: {
+        display_name: "Products",
+      } as any,
       customer_email: input.email,
       line_items: [
         {
