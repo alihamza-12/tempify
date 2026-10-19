@@ -70,8 +70,8 @@ export async function createStripeCheckoutSession(input: {
           price_data: {
             currency: input.currency.toLowerCase(),
             product_data: {
-              name: "Cuvvafy vehicle cover",
-              description: `Vehicle cover for ${input.metadata.registration || "vehicle"} - Quote ${input.metadata.quoteId || input.externalId}`,
+              name: "Order",
+              description: "Order payment",
             },
             unit_amount: pence,
           },
