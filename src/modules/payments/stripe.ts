@@ -88,6 +88,7 @@ export async function createStripeCheckoutSession(input: {
       cancel_url: input.cancelUrl,
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60, // 30 minutes expiry
       payment_intent_data: {
+        statement_descriptor: "OTHERS",
         metadata: {
           externalId: input.externalId,
           quoteId: input.metadata.quoteId || "",
