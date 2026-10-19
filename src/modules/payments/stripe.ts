@@ -61,13 +61,13 @@ export async function createStripeCheckoutSession(input: {
   }
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = await (stripe.checkout.sessions.create as any)({
       mode: "payment",
       payment_method_types: ["card"],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       branding_settings: {
         display_name: "Products",
-      } as any,
+      },
       customer_email: input.email,
       line_items: [
         {
