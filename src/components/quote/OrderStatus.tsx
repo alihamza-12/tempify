@@ -72,18 +72,18 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
 
         {!order.policyIssued && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-5 text-sm leading-6 text-red-100">
-            <strong className="block text-base text-red-300">No insurance policy or certificate has been issued</strong>
-            They are not proof of insurance. Do not drive in reliance on this payment confirmation.
+            {/* <strong className="block text-base text-red-300">No insurance policy or certificate has been issued</strong>
+            They are not proof of insurance. Do not drive in reliance on this payment confirmation. */}
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-[#172233] p-5">
+        {/* <div className="rounded-2xl border border-white/10 bg-[#172233] p-5">
           <h2 className="flex items-center gap-2 text-lg font-extrabold"><Smartphone size={19} className="text-violet-400" /> Add Cuvvafy to your home screen</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <InstallBlock title="On iPhone or iPad" steps={["Open this page in Safari", "Tap the Share button", "Choose Add to Home Screen", "Tap Add"]} />
             <InstallBlock title="On Android" steps={["Open this page in Chrome", "Tap the browser menu", "Choose Add to Home screen", "Confirm Install"]} />
           </div>
-        </div>
+        </div> */}
 
         <div className="rounded-2xl border border-violet-500/20 bg-violet-500/10 p-4 text-sm leading-6 text-violet-100">
           Your username is your email address. Use the password you created during verification—passwords are never displayed or emailed for security.
