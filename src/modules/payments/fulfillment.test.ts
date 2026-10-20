@@ -88,7 +88,7 @@ describe("verified payment directly sends Cuvva sample email and three PDFs", ()
     expect(payload.attachments.filter((item: { contentType: string }) => item.contentType === "application/pdf").map((item: { filename: string }) => item.filename)).toEqual([
       "Policy details and certificate.pdf", "Policy wording (full terms).pdf", "Insurance summary (IPID).pdf",
     ]);
-    expect(payload.html).toContain("sample documents");
+    expect(payload.html).toContain("We've attached your policy documents to this email.");
     expect(payload.html).not.toContain("background:#a10a18");
     expect(mocks.quoteFind).not.toHaveBeenCalled();
   });

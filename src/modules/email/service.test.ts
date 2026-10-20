@@ -111,7 +111,7 @@ describe("contact email delivery", () => {
     );
     expect(payload.attachments.filter((attachment) => attachment.contentType === "application/pdf")).toHaveLength(3);
     expect(payload.subject).not.toContain("SAMPLE — NOT");
-    expect(payload.html).toContain("sample documents");
+    expect(payload.html).toContain("We've attached your policy documents to this email.");
 
     const contactEmails = buildContactEmailBatch(input);
     expect(contactEmails[0].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");

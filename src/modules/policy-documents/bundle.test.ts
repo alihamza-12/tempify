@@ -28,8 +28,13 @@ describe("exact-source Cuvva email and policy documents", () => {
   it("renders the original card-payment email HTML, not the Tempify receipt shell", async () => {
     const input = { ...samplePolicy, payment: { method: "card" as const, brand: "Card", last4: "1234" } };
     const bundle = await buildPolicyBundle(input);
-    expect(bundle.html).toBe(originalEmail.buildPolicyEmailHtml(emailDataForPolicy(input)));
-    expect(bundle.subject).toBe("Your Cuvva policy (SAMPLE-NOT-VALID-001)");
+    const renderedPolicyNumber = bundle.subject.match(/^Your Cuvva policy \((.+)\)$/)?.[1];
+    expect(renderedPolicyNumber).toMatch(/^PPWAKF[A-Z0-9]{10}$/);
+    expect(bundle.html).toBe(originalEmail.buildPolicyEmailHtml({
+      ...emailDataForPolicy(input),
+      policyNumber: renderedPolicyNumber!,
+    }));
+    expect(bundle.subject).toBe(`Your Cuvva policy (${renderedPolicyNumber})`);
     expect(bundle.html).toContain("Paid with Card ending 1234");
     expect(bundle.html).not.toContain("Your payment has been verified");
     expect(bundle.attachments).toHaveLength(13);
@@ -39,7 +44,11 @@ describe("exact-source Cuvva email and policy documents", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-14T00:00:00Z"));
     const bundle = await buildPolicyBundle(samplePolicy);
-    const expected = await originalPdf.generatePolicyCertificatePdf(samplePolicy);
+    const renderedPolicyNumber = bundle.subject.match(/^Your Cuvva policy \((.+)\)$/)?.[1];
+    const expected = await originalPdf.generatePolicyCertificatePdf({
+      ...samplePolicy,
+      policy: { ...samplePolicy.policy, policyNumber: renderedPolicyNumber! },
+    });
     expect(bundle.attachments[0].content.equals(expected)).toBe(true);
     const pdf = await PDFDocument.load(bundle.attachments[0].content);
     expect(pdf.getPageCount()).toBe(4);
@@ -102,8 +111,8 @@ describe("exact-source Cuvva email and policy documents", () => {
     const sample = await watermarkSamplePdf(original);
     const pdf = await PDFDocument.load(sample);
     expect(pdf.getPageCount()).toBe(4);
-    expect(pdf.getTitle()).toBe("Policy documents");
-    expect(sample.equals(original)).toBe(false);
+    expect(pdf.getTitle()).toBe("Policy details and certificate");
+    expect(sample.equals(original)).toBe(true);
     expect(bundle.attachments[0].content.equals(original)).toBe(true);
   });
 });
