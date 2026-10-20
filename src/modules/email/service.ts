@@ -60,7 +60,7 @@ export async function preparePaymentDocumentEmail(input: {
       gbpPence(document.policy.premiumAmount) !== gbpPence(input.amount)) {
     throw new Error("Document snapshot does not match the verified order.");
   }
-  const bundle = await buildSamplePolicyBundle(document, true);
+  const bundle = await buildSamplePolicyBundle(document);
   const from = process.env.PAYMENT_EMAIL_FROM || "Cuvva <auto@cuvvapolicies.com>";
   if (/[\r\n]/.test(from)) throw new Error("Invalid payment email sender.");
   return {
