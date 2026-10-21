@@ -48,6 +48,19 @@ const orderSchema = new Schema(
     confirmationEmailAttempts: { type: Number, default: 0 },
     confirmationEmailId: String,
     confirmationEmailError: String,
+    // Separate delivery lifecycle prevents payment-email retries from resending the guide.
+    guideEmailStatus: {
+      type: String,
+      enum: ["pending", "sending", "sent", "failed"],
+      default: "pending",
+    },
+    guideEmailClaim: String,
+    guideEmailClaimedAt: Date,
+    guideEmailFirstAttemptAt: Date,
+    guideEmailNextRetryAt: Date,
+    guideEmailAttempts: { type: Number, default: 0 },
+    guideEmailId: String,
+    guideEmailError: String,
   },
   { timestamps: true, collection: "tempify_orders" },
 );

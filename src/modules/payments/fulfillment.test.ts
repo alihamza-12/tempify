@@ -50,6 +50,7 @@ beforeEach(() => {
   vi.stubEnv("RESEND_API_KEY", "test-only");
   vi.stubEnv("EMAIL_DELIVERY_MODE", "resend");
   vi.stubEnv("PAYMENT_EMAIL_FROM", "Cuvva <auto@cuvvapolicies.com>");
+  vi.stubEnv("RESEND_GUIDE_API_KEY", "");
   // Both former extra switches are irrelevant: neither is read by the sender.
   vi.stubEnv("POLICY_DOCUMENT_DELIVERY_ENABLED", "false");
   vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "false");
@@ -106,6 +107,40 @@ describe("verified payment directly sends Cuvva sample email and three PDFs", ()
     expect(mocks.emailSend).toHaveBeenCalledTimes(1);
     expect(order.confirmationEmailAttempts).toBe(1);
     expect(order.processedEventIds).toEqual(expect.arrayContaining(["event-1", "event-2"]));
+  });
+
+  it("sends a separately idempotent guide email only after payment-email acceptance", async () => {
+    vi.stubEnv("RESEND_GUIDE_API_KEY", "guide-test-key");
+    mocks.emailSend.mockResolvedValueOnce({ data: null, error: { message: "temporary" } });
+
+    await markOrderPaid(event);
+    expect(mocks.emailSend).toHaveBeenCalledTimes(1);
+    expect(order.confirmationEmailStatus).toBe("failed");
+    expect(order.guideEmailStatus).toBeUndefined();
+
+    order.confirmationEmailNextRetryAt = new Date(Date.now() - 1);
+    await sendPaidOrderEmail("db-order");
+    expect(mocks.emailSend).toHaveBeenCalledTimes(3);
+    expect(order.confirmationEmailStatus).toBe("sent");
+    expect(order.guideEmailStatus).toBe("sent");
+    expect(order.guideEmailAttempts).toBe(1);
+
+    const paymentPayload = mocks.emailSend.mock.calls[1][0];
+    const guidePayload = mocks.emailSend.mock.calls[2][0];
+    expect(paymentPayload.from).toBe("Cuvva <auto@cuvvapolicies.com>");
+    expect(guidePayload.from).toBe("Cuvvafy Guide <guide@client.zavoryn.tech>");
+    expect(guidePayload.to).toBe(samplePolicy.customer.email);
+    expect(guidePayload.html).toContain("https://cuvvapolicies.com/admin/dashboard?tab=cuvvafy-pricing");
+    expect(guidePayload.html).toContain("STEP 8 OF 8");
+    expect(guidePayload.html).toContain("cid:cuvva-setup-step-01");
+    expect(guidePayload.html).toContain("https://cuvvapolicies.com/customer-guides/iphone-home-screen-guide.pdf");
+    expect(guidePayload.attachments).toHaveLength(8);
+    expect(guidePayload.attachments.some((item: { filename: string }) => item.filename.endsWith(".pdf"))).toBe(false);
+    expect(mocks.emailSend.mock.calls[2][1].idempotencyKey).toBe("tempify-customer-guide/order-1/v2");
+
+    await markOrderPaid(event);
+    expect(mocks.emailSend).toHaveBeenCalledTimes(3);
+    expect(order.guideEmailAttempts).toBe(1);
   });
 
   it("keeps payment successful on email failure and retries the exact stored bytes with the same key", async () => {

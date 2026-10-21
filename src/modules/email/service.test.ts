@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { batchSend, emailSend } = vi.hoisted(() => ({
+const { batchSend, emailSend, apiKeys } = vi.hoisted(() => ({
   batchSend: vi.fn(),
   emailSend: vi.fn(),
+  apiKeys: [] as string[],
 }));
 
 vi.mock("resend", () => ({
   Resend: class {
+    constructor(key: string) { apiKeys.push(key); }
     batch = { send: batchSend };
     emails = { send: emailSend };
   },
@@ -17,6 +19,7 @@ import { samplePolicy } from "@/modules/policy-documents/fixture";
 import {
   buildContactEmailBatch,
   sendContactMessageEmails,
+  sendCustomerGuideEmail,
   sendPaymentConfirmationEmail,
   preparePaymentDocumentEmail,
 } from "./service";
@@ -36,8 +39,10 @@ describe("contact email delivery", () => {
     process.env.EMAIL_FROM = "Cuvvafy <auto@cuvvapolicies.com>";
     process.env.CONTACT_TO_EMAIL = "support@example.com";
     delete process.env.PAYMENT_EMAIL_FROM;
+    delete process.env.RESEND_GUIDE_API_KEY;
     batchSend.mockReset();
     emailSend.mockReset();
+    apiKeys.length = 0;
   });
 
   afterEach(() => {
@@ -45,6 +50,7 @@ describe("contact email delivery", () => {
     delete process.env.EMAIL_DELIVERY_MODE;
     delete process.env.EMAIL_FROM;
     delete process.env.PAYMENT_EMAIL_FROM;
+    delete process.env.RESEND_GUIDE_API_KEY;
     delete process.env.CONTACT_TO_EMAIL;
   });
 
@@ -116,5 +122,42 @@ describe("contact email delivery", () => {
     const contactEmails = buildContactEmailBatch(input);
     expect(contactEmails[0].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
     expect(contactEmails[1].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
+  });
+
+  it("sends the iPhone guide with the separate verified-domain sender and guide key", async () => {
+    process.env.RESEND_GUIDE_API_KEY = "re_guide_test";
+    emailSend.mockResolvedValue({ data: { id: "guide-id" }, error: null });
+
+    await expect(sendCustomerGuideEmail({
+      orderId: "order-42",
+      email: "customer@example.com",
+      firstName: "Ava",
+    })).resolves.toEqual({ id: "guide-id" });
+
+    expect(apiKeys).toContain("re_guide_test");
+    expect(emailSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: "Cuvvafy Guide <guide@client.zavoryn.tech>",
+        to: "customer@example.com",
+        subject: "Your Cuvva project access and iPhone setup",
+        html: expect.stringContaining("https://cuvvapolicies.com/admin/dashboard?tab=cuvvafy-pricing"),
+      }),
+      expect.objectContaining({ idempotencyKey: "tempify-customer-guide/order-42/v2" }),
+    );
+    const payload = emailSend.mock.calls[0][0];
+    const body = payload.html as string;
+    expect(body).toContain("same email address and password you use for Cuvvafy");
+    expect(body).toContain("STEP 8 OF 8");
+    expect(body).toContain("cuvvafy-pricing");
+    expect(body).toContain("https://cuvvapolicies.com/customer-guides/iphone-home-screen-guide.pdf");
+    expect(body).not.toContain("client.zavoryn.tech/customer-guides");
+    expect(body.match(/src="cid:cuvva-setup-step-/g)).toHaveLength(8);
+    expect(body).not.toContain("Your password is included");
+    expect(payload.attachments).toHaveLength(8);
+    expect(payload.attachments.every((attachment: { contentType: string; contentId: string }) =>
+      attachment.contentType === "image/jpeg" && attachment.contentId.startsWith("cuvva-setup-step-"),
+    )).toBe(true);
+    expect(payload.attachments.some((attachment: { filename: string }) => attachment.filename.toLowerCase().endsWith(".pdf"))).toBe(false);
+    expect(apiKeys).toContain("re_guide_test");
   });
 });

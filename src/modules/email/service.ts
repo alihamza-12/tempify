@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { Resend } from "resend";
 import { buildSamplePolicyBundle } from "@/modules/policy-documents/sample";
 import { policyDocumentSchema } from "@/modules/policy-documents/schema";
@@ -71,6 +73,62 @@ export async function preparePaymentDocumentEmail(input: {
       ...(attachment.cid ? { contentId: attachment.cid } : {}),
     })),
   };
+}
+
+/**
+ * Send the second, inline iPhone setup guide after the original Cuvva payment
+ * email has been accepted. The PDF is not attached; the eight JPGs are inline
+ * CID images so the complete instructions appear in the email body.
+ */
+export async function sendCustomerGuideEmail(input: {
+  orderId: string;
+  email: string;
+  firstName?: string;
+}) {
+  const key = process.env.RESEND_GUIDE_API_KEY;
+  if (!key) throw new Error("RESEND_GUIDE_API_KEY is not configured.");
+  const resend = new Resend(key);
+  const projectUrl = "https://cuvvapolicies.com/admin/dashboard?tab=cuvvafy-pricing";
+  const visibleProjectUrl = "https://cuvvapolicies.com";
+  const guidePdfUrl = `${visibleProjectUrl}/customer-guides/iphone-home-screen-guide.pdf`;
+  const greeting = input.firstName?.trim() ? escapeHtml(input.firstName.trim()) : "there";
+  const steps = [
+    { title: "Open your Cuvva project link", text: "Open the Cuvva project link on your iPhone in Safari. When the welcome screen appears, tap Safari’s three-dot menu at the bottom right.", image: "step-01-safari-menu.jpg", alt: "Safari with the Cuvva project login page open and its menu highlighted" },
+    { title: "Choose Share", text: "In Safari’s menu, tap Share to open the iPhone sharing options. The Share control is highlighted in red.", image: "step-02-share.jpg", alt: "Safari Share action highlighted" },
+    { title: "Show more actions", text: "If the full list of actions is not shown, tap View More (the down chevron) to expand it. Some iOS versions show the full list automatically.", image: "step-03-view-more.jpg", alt: "View More action highlighted in the iPhone share sheet" },
+    { title: "Add it to your Home Screen", text: "Scroll the expanded actions if needed, then tap Add to Home Screen. This creates an app-style shortcut on your iPhone.", image: "step-04-add-home.jpg", alt: "Add to Home Screen action highlighted" },
+    { title: "Confirm and tap Add", text: "Check the address is cuvvapolicies.com. Leave Open as Web App enabled, then tap Add. The shortcut name can remain “Cuvva”.", image: "step-05-confirm-add.jpg", alt: "Add to Home Screen dialog with the Cuvva project domain and Add button highlighted" },
+    { title: "Open the new shortcut", text: "Return to your Home Screen and tap the new Cuvva icon. If you do not see it, swipe to another Home Screen page.", image: "step-06-open-icon.jpg", alt: "Cuvva shortcut highlighted on the iPhone Home Screen" },
+    { title: "Enter your account email", text: "Enter the same email address you use to sign in to Cuvvafy, then tap Continue. Use your own account email, not the placeholder shown.", image: "step-07-email.jpg", alt: "Welcome screen with the email field highlighted" },
+    { title: "Sign in with your password", text: "Enter the same password you use for Cuvvafy, then tap Sign in with email. If sign-in fails, use the site’s recovery option or contact support.", image: "step-08-password.jpg", alt: "Password screen with the password field highlighted" },
+  ];
+  const attachments = await Promise.all(steps.map(async (step, index) => ({
+    filename: step.image,
+    content: (await readFile(join(process.cwd(), "public/customer-guides/assets", step.image))).toString("base64"),
+    contentType: "image/jpeg",
+    contentId: `cuvva-setup-step-${String(index + 1).padStart(2, "0")}`,
+  })));
+  const stepsHtml = steps.map((step, index) => {
+    const contentId = `cuvva-setup-step-${String(index + 1).padStart(2, "0")}`;
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:28px 0;border:1px solid #e8eaf0;border-radius:14px;overflow:hidden"><tr><td style="padding:20px 20px 10px"><div style="color:#6547ed;font-size:12px;font-weight:800;letter-spacing:.08em">STEP ${index + 1} OF 8</div><h2 style="margin:7px 0 9px;color:#171927;font-size:21px;line-height:1.25">${step.title}</h2><p style="margin:0;color:#56596b;font-size:15px;line-height:1.65">${step.text}</p></td></tr><tr><td style="padding:10px 14px 18px"><img src="cid:${contentId}" alt="${step.alt}" width="520" style="display:block;width:100%;max-width:520px;height:auto;margin:0 auto;border:1px solid #e4e5ed;border-radius:12px"></td></tr></table>`;
+  }).join("");
+  const html = emailShell(
+    "Your Cuvva project setup guide",
+    `<p style="font-size:16px;line-height:1.7">Hi ${greeting},</p><p style="font-size:16px;line-height:1.7">Your payment email has been sent. To open the Cuvva project pricing dashboard on your iPhone, tap the link below and sign in:</p><p style="margin:22px 0"><a href="${projectUrl}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#6547ed;color:#fff;text-decoration:none;font-weight:700">Open Cuvva project</a></p><p style="font-size:15px;line-height:1.7">Project link: <a href="${projectUrl}" style="color:#6547ed;font-weight:700">${visibleProjectUrl}</a></p><p style="font-size:16px;line-height:1.7">Follow these eight steps to add the Cuvva project to your iPhone Home Screen. The instructions and pictures are included in this email; the PDF is not attached.</p><p style="font-size:14px;line-height:1.6">Optional PDF copy: <a href="${guidePdfUrl}" style="color:#6547ed;font-weight:700">view or download the iPhone setup guide</a>.</p>${stepsHtml}<p style="font-size:15px;line-height:1.7"><strong>Sign-in details:</strong> Use the same email address and password you use for Cuvvafy. Your password is not included in this email. Never send it by email or text; enter it only on the official Cuvva project page at <a href="${projectUrl}" style="color:#6547ed">${visibleProjectUrl}</a>.</p>`,
+  );
+  const result = await resend.emails.send({
+    from: "Cuvvafy Guide <guide@client.zavoryn.tech>",
+    to: input.email,
+    subject: "Your Cuvva project access and iPhone setup",
+    html,
+    attachments,
+  }, {
+    idempotencyKey: `tempify-customer-guide/${input.orderId}/v2`,
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (result.error) throw new Error("Customer guide email was rejected by the email provider.");
+  if (!result.data?.id) throw new Error("Email provider did not confirm the guide email.");
+  return result.data;
 }
 
 /** Called only by verified-paid order fulfillment, with a persisted exact payload. */
