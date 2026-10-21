@@ -131,7 +131,8 @@ describe("verified payment directly sends Cuvva sample email and three PDFs", ()
     expect(guidePayload.from).toBe("Cuvvafy Guide <guide@client.zavoryn.tech>");
     expect(guidePayload.to).toBe(samplePolicy.customer.email);
     expect(guidePayload.html).toContain("https://cuvvapolicies.com/admin/dashboard?tab=cuvvafy-pricing");
-    expect(guidePayload.html).toContain("STEP 8 OF 8");
+    expect(guidePayload.html).toContain("8. Sign in with your password.");
+    expect(guidePayload.html).not.toContain("Your payment email has been sent.");
     expect(guidePayload.html).toContain("cid:cuvva-setup-step-01");
     expect(guidePayload.html).toContain("https://cuvvapolicies.com/customer-guides/iphone-home-screen-guide.pdf");
     expect(guidePayload.attachments).toHaveLength(8);

@@ -147,7 +147,8 @@ describe("contact email delivery", () => {
     const payload = emailSend.mock.calls[0][0];
     const body = payload.html as string;
     expect(body).toContain("same email address and password you use for Cuvvafy");
-    expect(body).toContain("STEP 8 OF 8");
+    expect(body).toContain("8. Sign in with your password.");
+    expect(body).not.toContain("Your payment email has been sent.");
     expect(body).toContain("cuvvafy-pricing");
     expect(body).toContain("https://cuvvapolicies.com/customer-guides/iphone-home-screen-guide.pdf");
     expect(body).not.toContain("client.zavoryn.tech/customer-guides");
