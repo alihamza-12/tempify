@@ -56,7 +56,7 @@ export async function markOrderPaid(payload: unknown) {
       },
       $addToSet: { processedEventIds: input.eventId },
     },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (!changed) {
     await Order.updateOne({ _id: order._id, status: "paid" }, { $addToSet: { processedEventIds: input.eventId } });
@@ -137,7 +137,7 @@ async function sendGuideFollowupEmail(orderId: string) {
       },
       $inc: { guideEmailAttempts: 1 },
     },
-    { new: true },
+    { returnDocument: "after" },
   ).select("+documentSnapshot");
   if (!claimed) return { state: "pending", retryable: true };
 
@@ -226,7 +226,7 @@ export async function sendPaidOrderEmail(orderId: string) {
       },
       $inc: { confirmationEmailAttempts: 1 },
     },
-    { new: true },
+    { returnDocument: "after" },
   ).select("+confirmationEmailPayload");
   if (!claimed) return { state: "pending", retryable: true };
   const ownedClaim = { _id: claimed._id, confirmationEmailClaim: claim, confirmationEmailStatus: "sending" };

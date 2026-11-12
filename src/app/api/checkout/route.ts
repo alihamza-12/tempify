@@ -8,6 +8,7 @@ import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
+import { canUseStripeTestCheckout, isAllowedTestCheckoutEmail } from "@/modules/payments/checkout-mode";
 import { createStripeCheckoutSession } from "@/modules/payments/stripe";
 import { customerProfileSchema } from "@/modules/profile/schema";
 import { saveCustomerProfile } from "@/modules/profile/service";
@@ -87,11 +88,23 @@ export async function POST(request: Request) {
     });
     await saveCustomerProfile(String(user._id), profile);
 
-    // Preserve the existing live-checkout gate.
-    if (process.env.LIVE_POLICY_CHECKOUT_ENABLED !== "true") {
+    // This build supports test-mode checkout only: no authorised policy issuer
+    // is integrated, so live cards must not be charged for unissued cover.
+    const testCheckoutAllowed = canUseStripeTestCheckout({
+      secretKey: process.env.STRIPE_SECRET_KEY,
+      nodeEnv: process.env.NODE_ENV,
+      enabledInProduction: process.env.STRIPE_TEST_CHECKOUT_ENABLED,
+    });
+    if (!testCheckoutAllowed) {
       return NextResponse.json(
-        { error: "Your details were saved, but checkout is not enabled until policy-issuance authority is confirmed." },
+        { error: "Checkout is disabled. This build only allows approved Stripe test-mode checkout; live policy issuance is not implemented." },
         { status: 503 },
+      );
+    }
+    if (!isAllowedTestCheckoutEmail(user.email, process.env.STRIPE_TEST_ALLOWED_EMAILS)) {
+      return NextResponse.json(
+        { error: "This test checkout is restricted to the configured test email addresses." },
+        { status: 403 },
       );
     }
 

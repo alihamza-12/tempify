@@ -15,13 +15,16 @@ vi.mock("resend", () => ({
 }));
 
 import { samplePolicy } from "@/modules/policy-documents/fixture";
+import { buildPolicyBundle } from "@/modules/policy-documents/bundle";
 
 import {
   buildContactEmailBatch,
   sendContactMessageEmails,
+  sendVerificationEmail,
   sendCustomerGuideEmail,
   sendPaymentConfirmationEmail,
   preparePaymentDocumentEmail,
+  paymentEmailPayloadFromBundle,
 } from "./service";
 
 const input = {
@@ -52,6 +55,7 @@ describe("contact email delivery", () => {
     delete process.env.PAYMENT_EMAIL_FROM;
     delete process.env.RESEND_GUIDE_API_KEY;
     delete process.env.CONTACT_TO_EMAIL;
+    vi.unstubAllEnvs();
   });
 
   it("builds a support notification and a separate customer acknowledgement", () => {
@@ -116,12 +120,64 @@ describe("contact email delivery", () => {
       expect.objectContaining({ idempotencyKey: `tempify-payment-documents/${samplePolicy.policy._id}/v1` }),
     );
     expect(payload.attachments.filter((attachment) => attachment.contentType === "application/pdf")).toHaveLength(3);
-    expect(payload.subject).not.toContain("SAMPLE — NOT");
+    expect(payload.subject).toBe("Payment received — no policy or cover issued");
+    expect(payload.html).toContain("Payment confirmation only — no policy or insurance cover has been issued.");
+    expect(payload.html).toContain("unissued sample documents, not proof of insurance");
     expect(payload.html).toContain("We've attached your policy documents to this email.");
+
+    // The warning is an email wrapper only. Keep every rendered attachment
+    // byte-for-byte identical to the renderer's output.
+    const stablePolicy = {
+      ...samplePolicy,
+      policy: { ...samplePolicy.policy, policyNumber: "PPWAKF1234567890" },
+    };
+    const unchangedBundle = await buildPolicyBundle(stablePolicy);
+    const wrappedBundle = paymentEmailPayloadFromBundle(unchangedBundle, "Cuvva <auto@cuvvapolicies.com>");
+    expect(wrappedBundle.attachments.map((attachment) => attachment.content)).toEqual(
+      unchangedBundle.attachments.map((attachment) => attachment.content.toString("base64")),
+    );
 
     const contactEmails = buildContactEmailBatch(input);
     expect(contactEmails[0].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
     expect(contactEmails[1].from).toBe("Cuvvafy <auto@cuvvapolicies.com>");
+  });
+
+  it("sends OTPs through Resend in production even if the stale mode is console", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "console");
+    emailSend.mockResolvedValue({ data: { id: "otp-message" }, error: null });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await sendVerificationEmail({ email: "ava@example.com", firstName: "Ava", code: "123456" });
+    expect(result).toEqual({ id: "otp-message" });
+    expect(emailSend).toHaveBeenCalledWith(expect.objectContaining({ to: "ava@example.com" }));
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+
+  it("sends OTPs through Resend in local console mode and never returns or logs the code", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "console");
+    emailSend.mockResolvedValue({ data: { id: "otp-message" }, error: null });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    const result = await sendVerificationEmail({ email: "ava@example.com", firstName: "Ava", code: "123456" });
+    expect(result).toEqual({ id: "otp-message" });
+    expect(emailSend).toHaveBeenCalledWith(expect.objectContaining({ to: "ava@example.com" }));
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
+
+  it("sends contact emails through Resend in production even if the stale mode is console", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "console");
+    batchSend.mockResolvedValue({ data: [{ id: "support" }, { id: "ack" }], error: null });
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await expect(sendContactMessageEmails(input)).resolves.toHaveLength(2);
+    expect(batchSend).toHaveBeenCalledOnce();
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
   });
 
   it("sends the iPhone guide with the separate verified-domain sender and guide key", async () => {

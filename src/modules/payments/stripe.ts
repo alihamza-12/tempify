@@ -19,17 +19,33 @@ function getStripe(): Stripe {
   return stripeInstance;
 }
 
+export function stripeKeyModesMatch(secretKey: string, publishableKey?: string) {
+  if (!publishableKey) return true;
+  const secretMode = secretKey.startsWith("sk_test_") ? "test" : secretKey.startsWith("sk_live_") ? "live" : null;
+  const publishableMode = publishableKey.startsWith("pk_test_") ? "test" : publishableKey.startsWith("pk_live_") ? "live" : null;
+  return Boolean(secretMode && publishableMode && secretMode === publishableMode);
+}
+
+export function stripeKeyConfigurationIsConsistent(secretKey: string, publishableKeys: string[]) {
+  const configured = publishableKeys.map((key) => key.trim()).filter(Boolean);
+  return new Set(configured).size <= 1 && configured.every((key) => stripeKeyModesMatch(secretKey, key));
+}
+
 function configuration() {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) {
     console.error("[payment] STRIPE_SECRET_KEY is not configured");
     throw new PaymentConfigurationError("Online payment is temporarily unavailable. Please try again later.");
   }
-  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?.trim() || process.env.STRIPE_PUBLISHABLE_KEY?.trim();
-  return {
-    secretKey,
-    publishableKey,
-  };
+  const publishableKeys = [
+    process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || "",
+    process.env.STRIPE_PUBLISHABLE_KEY || "",
+  ];
+  if (!stripeKeyConfigurationIsConsistent(secretKey, publishableKeys)) {
+    console.error("[payment] Stripe secret/publishable keys are mismatched or conflicting");
+    throw new PaymentConfigurationError("Payment is temporarily unavailable because the Stripe keys are mismatched.");
+  }
+  return { secretKey, publishableKey: publishableKeys.map((key) => key.trim()).find(Boolean) };
 }
 
 export async function createStripeCheckoutSession(input: {
@@ -104,18 +120,19 @@ export async function createStripeCheckoutSession(input: {
       throw new PaymentProviderError("Failed to create checkout session.");
     }
 
-    // Validate checkout URL is Stripe hosted
+    // Never redirect a customer to a provider-controlled/unexpected host.
     if (!session.url.startsWith("https://checkout.stripe.com/")) {
-      console.warn("[stripe:create] unexpected checkout URL", session.url);
+      console.error("[stripe:create] rejected unexpected checkout host");
+      throw new PaymentProviderError("Secure checkout could not be verified.");
     }
 
-    // Validate amount
+    // The provider-created amount and currency must exactly match the quote.
     if (session.amount_total !== pence || session.currency?.toUpperCase() !== "GBP") {
-      console.error("[stripe:create] amount/currency mismatch", {
+      console.error("[stripe:create] rejected amount/currency mismatch", {
         expected: { amount: pence, currency: "GBP" },
         got: { amount: session.amount_total, currency: session.currency },
       });
-      // Don't fail, just log - Stripe might have different handling
+      throw new PaymentProviderError("The checkout amount could not be verified.");
     }
 
     return {
@@ -147,7 +164,10 @@ export async function getStripeSession(sessionId: string) {
       sessionId: session.id,
       orderUUID: session.id,
       paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id || null,
-      status: session.payment_status === "paid" ? "PAID" : session.status === "complete" ? "PAID" : session.status === "expired" ? "EXPIRED" : "UNPAID",
+      // Checkout completion is not proof of settlement (for example, delayed
+      // payment methods can complete before funds settle). Only the provider's
+      // explicit paid state is accepted as payment confirmation.
+      status: mapStripeSessionStatus(session.payment_status, session.status),
       amount: session.amount_total ? (session.amount_total / 100).toFixed(2) : "0.00",
       currency: (session.currency || "gbp").toUpperCase(),
       checkoutUrl: session.url || "",
@@ -172,6 +192,12 @@ export async function getStripePaymentIntent(paymentIntentId: string) {
     console.error("[stripe:paymentIntent] failed", error instanceof Error ? error.message : "unknown");
     throw new PaymentProviderError("Payment intent not found.", 404);
   }
+}
+
+export function mapStripeSessionStatus(paymentStatus?: string | null, sessionStatus?: string | null) {
+  if (paymentStatus?.toLowerCase() === "paid") return "PAID";
+  if (sessionStatus?.toLowerCase() === "expired") return "EXPIRED";
+  return "UNPAID";
 }
 
 export function mapPaymentStatus(status: string) {

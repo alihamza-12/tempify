@@ -60,6 +60,7 @@ let emailCalls = 0;
 let deliveries = 0;
 let providerTimesOut = false;
 let providerBadUrl = false;
+let providerBadAmount = false;
 let emailFailures = 0;
 const remoteSessions = new Map<string, RemoteSession>();
 const messages = new Map<string, { hash: string; payload: Record<string, unknown> }>();
@@ -71,6 +72,8 @@ beforeAll(async () => {
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", "whsec_audit_signature_not_live");
   vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_audit");
   vi.stubEnv("RESEND_API_KEY", "re_audit_not_live");
+  vi.stubEnv("RESEND_GUIDE_API_KEY", "");
+  vi.stubEnv("STRIPE_TEST_ALLOWED_EMAILS", "audit@example.invalid");
   vi.stubEnv("EMAIL_DELIVERY_MODE", "resend");
   vi.stubEnv("PAYMENT_EMAIL_FROM", "Cuvva <auto@cuvvapolicies.com>");
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.invalid");
@@ -87,7 +90,7 @@ beforeAll(async () => {
       const session: RemoteSession = {
         id,
         object: "checkout.session",
-        amount_total: params.line_items[0].price_data.unit_amount,
+        amount_total: params.line_items[0].price_data.unit_amount + (providerBadAmount ? 1 : 0),
         currency: params.line_items[0].price_data.currency,
         status: "open",
         payment_status: "unpaid",
@@ -105,7 +108,7 @@ beforeAll(async () => {
     const session: RemoteSession = {
       id,
       object: "checkout.session",
-      amount_total: params.line_items[0].price_data.unit_amount,
+      amount_total: params.line_items[0].price_data.unit_amount + (providerBadAmount ? 1 : 0),
       currency: params.line_items[0].price_data.currency,
       status: "open",
       payment_status: "unpaid",
@@ -158,13 +161,14 @@ beforeEach(async () => {
   expect(mongoose.connection.name).toBe("tempify_payment_audit");
   await Promise.all([Order.deleteMany({}), Quote.deleteMany({}), User.deleteMany({})]);
   createCalls = emailCalls = deliveries = 0;
-  providerTimesOut = providerBadUrl = false;
+  providerTimesOut = providerBadUrl = providerBadAmount = false;
   emailFailures = 0;
   remoteSessions.clear();
   messages.clear();
   customerId = new mongoose.Types.ObjectId();
   await User.collection.insertOne({ _id: customerId, email: "audit@example.invalid", fullName: "Audit Customer", role: "Customer", status: "Active" });
   auth.session.mockResolvedValue({ userId: String(customerId), email: "audit@example.invalid", role: "Customer" });
+  vi.stubEnv("RESEND_GUIDE_API_KEY", "");
   vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "true");
 });
 
@@ -261,6 +265,27 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
     expect(updated?.confirmationEmailPayload).toBeUndefined();
   });
 
+  it("sends both post-payment emails in test mode even with the legacy console environment value", async () => {
+    vi.stubEnv("EMAIL_DELIVERY_MODE", "console");
+    vi.stubEnv("RESEND_GUIDE_API_KEY", "re_guide_test_only");
+    const { local, remote } = await createOrder();
+    expect((await webhook(stripeWebhookRequest(remote))).status).toBe(200);
+
+    const updated = await Order.findById(local._id);
+    expect(updated?.confirmationEmailStatus).toBe("sent");
+    expect(updated?.guideEmailStatus).toBe("sent");
+    expect(deliveries).toBe(2);
+    const guideEntry = [...messages.entries()].find(([key]) => key === `tempify-customer-guide/${local.publicId}/v2`);
+    expect(guideEntry).toBeTruthy();
+    const guide = guideEntry![1].payload as { from: string; to: string; html: string; attachments: { filename: string }[] };
+    expect(guide.from).toBe("Cuvvafy Guide <guide@client.zavoryn.tech>");
+    expect(guide.to).toBe("audit@example.invalid");
+    expect(guide.html).toContain("https://cuvvapolicies.com/admin/dashboard?tab=cuvvafy-pricing");
+    expect(guide.html).toContain("Your password is not included here.");
+    expect(guide.attachments).toHaveLength(8);
+    expect(guide.attachments.some(({ filename }) => filename.endsWith(".pdf"))).toBe(false);
+  });
+
   it("three concurrent paid notifications produce one submitted email", async () => {
     const { local, remote } = await createOrder();
     await Promise.all(Array.from({ length: 3 }, () => webhook(stripeWebhookRequest(remote))));
@@ -322,17 +347,27 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
     expect((await requestCheckout(q.publicId)).status).toBeGreaterThanOrEqual(400);
   });
 
+  it("rejects a provider checkout whose amount differs from the quote", async () => {
+    const q = await quote();
+    providerBadAmount = true;
+    expect((await requestCheckout(q.publicId)).status).toBeGreaterThanOrEqual(400);
+    const order = await Order.findOne({ quoteId: q._id });
+    expect(order?.checkoutCreationStatus).toBe("review_required");
+    expect(order?.checkoutUrl).toBeUndefined();
+  });
+
   it("customer A cannot read customer B's order", async () => {
     const { local } = await createOrder();
     auth.session.mockResolvedValue({ userId: String(new mongoose.Types.ObjectId()), email: "other@example.invalid", role: "Customer" });
     expect((await status(new Request("https://app.example.invalid"), { params: Promise.resolve({ id: local.publicId }) })).status).toBe(404);
   });
 
-  it("false live gate never calls the payment provider", async () => {
+  it("allows allowlisted Stripe test checkout even while live policy checkout stays disabled", async () => {
     const q = await quote();
     vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "false");
-    expect((await requestCheckout(q.publicId)).status).toBe(503);
-    expect(createCalls).toBe(0);
-    expect(await Order.countDocuments()).toBe(0);
+    const response = await requestCheckout(q.publicId);
+    expect(response.status).toBe(201);
+    expect(createCalls).toBe(1);
+    expect(await Order.countDocuments()).toBe(1);
   });
 });

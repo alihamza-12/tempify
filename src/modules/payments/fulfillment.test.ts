@@ -180,9 +180,10 @@ describe("verified payment directly sends Cuvva sample email and three PDFs", ()
     expect(mocks.emailSend).not.toHaveBeenCalled();
   });
 
-  it("never emails an unpaid order or treats console mode as provider acceptance", async () => {
+  it("never emails an unpaid order or treats missing provider configuration as acceptance", async () => {
     expect(await sendPaidOrderEmail("db-order")).toMatchObject({ state: "not_paid" });
     vi.stubEnv("EMAIL_DELIVERY_MODE", "console");
+    vi.stubEnv("RESEND_API_KEY", "");
     await markOrderPaid(event);
     expect(order.confirmationEmailStatus).toBe("failed");
     expect(mocks.emailSend).not.toHaveBeenCalled();

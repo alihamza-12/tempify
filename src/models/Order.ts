@@ -15,11 +15,11 @@ const orderSchema = new Schema(
       index: true,
     },
     // Stripe integration (primary)
-    stripeSessionId: { type: String, index: true },
+    stripeSessionId: String,
     stripePaymentIntentId: String,
     stripeCustomerId: String,
     // Legacy PayMeGate (kept for backward compatibility with old orders)
-    paymegateOrderUUID: { type: String, index: true },
+    paymegateOrderUUID: String,
     checkoutUrl: String,
     checkoutCreationStatus: { type: String, enum: ["creating", "ready", "review_required"], default: "creating" },
     transactionUUID: String,

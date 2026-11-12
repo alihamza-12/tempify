@@ -4,7 +4,7 @@ import { getSession } from "@/lib/session";
 import { Order } from "@/models/Order";
 import { getStripeSession, mapPaymentStatus } from "@/modules/payments/stripe";
 import { matchesStoredPayment } from "@/modules/payments/validation";
-import { canRetryPaymentEmail } from "@/modules/payments/email-retry";
+import { canRetryGuideEmail, canRetryPaymentEmail } from "@/modules/payments/email-retry";
 import { markOrderPaid, sendPaidOrderEmail } from "@/modules/payments/fulfillment";
 
 export const runtime = "nodejs";
@@ -18,8 +18,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const order = await Order.findOne({ publicId: id, userId: session.userId }).lean();
   if (!order) return NextResponse.json({ error: "Order not found." }, { status: 404 });
 
-  // Reconcile with Stripe if unpaid and we have a session ID
-  const sessionId = order.stripeSessionId || order.paymegateOrderUUID;
+  // Reconcile only a Stripe session with Stripe. Legacy PayMeGate identifiers
+  // are not valid Stripe session IDs and must never be queried as such.
+  const sessionId = order.stripeSessionId;
   if (order.status === "unpaid" && sessionId && process.env.STRIPE_SECRET_KEY) {
     try {
       const remote = await getStripeSession(sessionId);
@@ -55,8 +56,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  if (order.status === "paid" && canRetryPaymentEmail(order)) {
+  if (order.status === "paid" && (canRetryPaymentEmail(order) || canRetryGuideEmail(order))) {
     try {
+      // The payment email and guide have separate retry state. Once the first
+      // email is accepted, a guide-only failure can still be retried here.
       await sendPaidOrderEmail(String(order._id));
     } catch {
       console.warn("[payment:email] retry unavailable", order.publicId);
@@ -67,6 +70,18 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   // validation accepted payment. This also includes changes from a concurrent webhook.
   const latest = await Order.findOne({ publicId: id, userId: session.userId }).lean();
   if (!latest) return NextResponse.json({ error: "Order not found." }, { status: 404 });
+
+  const guideEmailStatus = latest.confirmationEmailStatus !== "sent"
+    ? "waiting"
+    : latest.guideEmailStatus === "sent"
+      ? "sent"
+      : !process.env.RESEND_GUIDE_API_KEY
+        ? "not_configured"
+        : latest.guideEmailStatus === "sending"
+          ? "sending"
+          : canRetryGuideEmail(latest)
+            ? "retrying"
+            : "manual_review";
 
   return NextResponse.json(
     {
@@ -79,6 +94,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       fulfillmentStatus: latest.fulfillmentStatus || (latest.status === "paid" ? "blocked_pending_authority" : "pending_payment"),
       confirmationEmailStatus: latest.confirmationEmailStatus || "pending",
       confirmationEmailRetryable: canRetryPaymentEmail(latest),
+      guideEmailStatus,
+      guideEmailRetryable: canRetryGuideEmail(latest),
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

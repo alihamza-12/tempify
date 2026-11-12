@@ -26,7 +26,7 @@ const initial = {
   _id: "database-order", publicId: "local-order", userId: "customer-1",
   stripeSessionId: "provider-order", paymegateOrderUUID: "provider-order", amount: 12.34, currency: "GBP",
   status: "unpaid", paidAt: null, policyId: null,
-  fulfillmentStatus: "pending_payment", confirmationEmailStatus: "pending",
+  fulfillmentStatus: "pending_payment", confirmationEmailStatus: "pending", guideEmailStatus: "pending",
 };
 const remote = {
   sessionId: "provider-order",
@@ -44,6 +44,7 @@ describe("order status uses persisted, validated payment state", () => {
     vi.resetAllMocks();
     vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_only");
     vi.stubEnv("PAYMEGATE_API_KEY", "test-only");
+    vi.stubEnv("RESEND_GUIDE_API_KEY", "");
     vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.session.mockResolvedValue({ userId: "customer-1" });
     mocks.remote.mockResolvedValue(remote);
@@ -62,6 +63,14 @@ describe("order status uses persisted, validated payment state", () => {
     expect((await call()).status).toBe(404);
     expect(mocks.findOne).toHaveBeenCalledWith({ publicId: "local-order", userId: "customer-1" });
     expect(mocks.remote).not.toHaveBeenCalled();
+  });
+
+  it("never sends a legacy PayMeGate order ID to Stripe", async () => {
+    const legacyOrder = { ...initial, stripeSessionId: undefined, paymegateOrderUUID: "old-paymegate-id" };
+    reads(legacyOrder, legacyOrder);
+    const response = await call();
+    expect(mocks.remote).not.toHaveBeenCalled();
+    expect((await response.json()).status).toBe("unpaid");
   });
 
   it.each([
@@ -86,7 +95,7 @@ describe("order status uses persisted, validated payment state", () => {
     reads(initial, { ...initial, status: "paid", paidAt: remote.paidAt, fulfillmentStatus: "blocked_pending_authority", confirmationEmailStatus: "failed" });
     const response = await call();
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(await response.json()).toMatchObject({ status: "paid", paidAt: remote.paidAt, policyIssued: false, fulfillmentStatus: "blocked_pending_authority", confirmationEmailStatus: "failed" });
+    expect(await response.json()).toMatchObject({ status: "paid", paidAt: remote.paidAt, policyIssued: false, fulfillmentStatus: "blocked_pending_authority", confirmationEmailStatus: "failed", guideEmailStatus: "waiting", guideEmailRetryable: false });
     expect(mocks.markPaid).toHaveBeenCalledWith(expect.objectContaining({ externalId: "local-order", orderUUID: "provider-order" }));
   });
 
@@ -96,6 +105,34 @@ describe("order status uses persisted, validated payment state", () => {
     const response = await call();
     expect(mocks.updateOne).toHaveBeenCalledWith({ _id: "database-order", status: "unpaid" }, { $set: { status: "failed" } });
     expect((await response.json()).status).toBe("paid");
+  });
+
+  it("surfaces and retries a guide-only failure without resending the accepted payment email", async () => {
+    vi.stubEnv("RESEND_GUIDE_API_KEY", "guide-test-key");
+    const failedGuide = {
+      ...initial,
+      status: "paid",
+      confirmationEmailStatus: "sent",
+      guideEmailStatus: "failed",
+      guideEmailAttempts: 1,
+      guideEmailFirstAttemptAt: new Date(Date.now() - 120_000),
+      guideEmailNextRetryAt: new Date(Date.now() - 1),
+    };
+    const afterRetry = { ...failedGuide, guideEmailStatus: "sent" };
+    reads(failedGuide, afterRetry);
+
+    const response = await call();
+    expect(mocks.sendPaidEmail).toHaveBeenCalledWith("database-order");
+    expect(await response.json()).toMatchObject({ guideEmailStatus: "sent", guideEmailRetryable: false });
+  });
+
+  it("reports a missing guide key instead of implying the second email was sent", async () => {
+    const paid = { ...initial, status: "paid", confirmationEmailStatus: "sent" };
+    reads(paid, paid);
+    const result = await (await call()).json();
+    expect(result.guideEmailStatus).toBe("not_configured");
+    expect(result.guideEmailRetryable).toBe(false);
+    expect(mocks.sendPaidEmail).not.toHaveBeenCalled();
   });
 
   it("does not infer policy issuance from a policy ID alone", async () => {

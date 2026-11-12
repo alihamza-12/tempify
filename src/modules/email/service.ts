@@ -22,14 +22,13 @@ export async function sendVerificationEmail(input: {
   const resend = getResend();
   const deliveryMode = process.env.EMAIL_DELIVERY_MODE || "resend";
 
-  if (!resend || deliveryMode === "console") {
-    if (process.env.NODE_ENV === "production" && deliveryMode !== "console") {
-      throw new Error("RESEND_API_KEY is not configured.");
-    }
-    console.info(`[email:development] OTP for ${input.email}: ${input.code}`);
-    return { id: "development-console" };
+  if (deliveryMode !== "console" && deliveryMode !== "resend") {
+    throw new Error("EMAIL_DELIVERY_MODE must be console or resend.");
   }
+  if (!resend) throw new Error("RESEND_API_KEY is not configured; OTP delivery requires email.");
 
+  // Console is retained as a backwards-compatible environment value, but all
+  // configured deliveries go through Resend. Never log or return verification codes.
   const result = await resend.emails.send({
     from: process.env.EMAIL_FROM || "Cuvvafy <auto@cuvvapolicies.com>",
     to: input.email,
@@ -62,11 +61,30 @@ export async function preparePaymentDocumentEmail(input: {
       gbpPence(document.policy.premiumAmount) !== gbpPence(input.amount)) {
     throw new Error("Document snapshot does not match the verified order.");
   }
-  const bundle = await buildSamplePolicyBundle(document, true);
+  const bundle = await buildSamplePolicyBundle(document);
   const from = process.env.PAYMENT_EMAIL_FROM || "Cuvva <auto@cuvvapolicies.com>";
   if (/[\r\n]/.test(from)) throw new Error("Invalid payment email sender.");
+
+  // Keep the existing rendered PDF/document bytes and the original Cuvva HTML
+  // unchanged, but make the email wrapper truthful: Tempify has not issued a
+  // Cuvva policy or activated cover for this paid order.
+  return paymentEmailPayloadFromBundle(bundle, from);
+}
+
+export function paymentEmailPayloadFromBundle(
+  bundle: Awaited<ReturnType<typeof buildSamplePolicyBundle>>,
+  from: string,
+): PreparedPaymentEmail {
+  const paymentOnlyNotice = `<div role="note" style="margin:0 auto 24px;max-width:620px;padding:18px 20px;border:2px solid #b42318;border-radius:10px;background:#fff3f1;color:#7a271a;font:16px/1.55 Arial,sans-serif"><strong style="display:block;font-size:18px">Payment confirmation only — no policy or insurance cover has been issued.</strong><p style="margin:8px 0 0">The attached Cuvva-format documents are unissued sample documents, not proof of insurance. Do not drive in reliance on this payment email. Contact support about policy issuance.</p></div>`;
+  const html = /<body\b[^>]*>/i.test(bundle.html)
+    ? bundle.html.replace(/<body\b[^>]*>/i, (openingTag) => `${openingTag}${paymentOnlyNotice}`)
+    : `${paymentOnlyNotice}${bundle.html}`;
+
   return {
-    from, to: bundle.to, subject: bundle.subject, html: bundle.html,
+    from,
+    to: bundle.to,
+    subject: "Payment received — no policy or cover issued",
+    html,
     attachments: bundle.attachments.map((attachment) => ({
       filename: attachment.filename, content: attachment.content.toString("base64"),
       contentType: attachment.contentType,
@@ -135,8 +153,9 @@ export async function sendCustomerGuideEmail(input: {
 export async function sendPaymentConfirmationEmail(input: { orderId: string; payload: PreparedPaymentEmail }) {
   const resend = getResend();
   if (!resend) throw new Error("RESEND_API_KEY is not configured.");
-  if ((process.env.EMAIL_DELIVERY_MODE || "resend") !== "resend") {
-    throw new Error("Email delivery is disabled by EMAIL_DELIVERY_MODE.");
+  const deliveryMode = process.env.EMAIL_DELIVERY_MODE || "resend";
+  if (deliveryMode !== "console" && deliveryMode !== "resend") {
+    throw new Error("EMAIL_DELIVERY_MODE must be console or resend.");
   }
   const result = await resend.emails.send(input.payload, {
     idempotencyKey: `tempify-payment-documents/${input.orderId}/v1`,
@@ -196,18 +215,11 @@ export function buildContactEmailBatch(input: ContactEmailInput) {
 export async function sendContactMessageEmails(input: ContactEmailInput) {
   const resend = getResend();
   const deliveryMode = process.env.EMAIL_DELIVERY_MODE || "resend";
-  const cleanSubject = input.subject.replace(/[\r\n]+/g, " ").trim();
 
-  if (!resend || deliveryMode === "console") {
-    if (process.env.NODE_ENV === "production" && deliveryMode !== "console") {
-      throw new Error("RESEND_API_KEY is not configured.");
-    }
-    console.info("[email:development] Contact message and customer acknowledgement", {
-      from: input.email,
-      subject: cleanSubject,
-    });
-    return { id: "development-console" };
+  if (deliveryMode !== "console" && deliveryMode !== "resend") {
+    throw new Error("EMAIL_DELIVERY_MODE must be console or resend.");
   }
+  if (!resend) throw new Error("RESEND_API_KEY is not configured.");
 
   const result = await resend.batch.send(buildContactEmailBatch(input));
   if (result.error) throw new Error(result.error.message);

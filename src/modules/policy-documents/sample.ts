@@ -1,4 +1,3 @@
-import { PDFDocument } from "pdf-lib";
 import { buildPolicyBundle } from "./bundle";
 
 /**
@@ -24,7 +23,7 @@ export async function watermarkSamplePdf(bytes: Uint8Array): Promise<Buffer> {
  * - Body: "We've attached your policy documents..." — NO "sample documents" disclaimer
  * - PDFs: unmarked, same 3 attachments as live
  */
-export async function buildSamplePolicyBundle(input: unknown, paymentConfirmed = false) {
+export async function buildSamplePolicyBundle(input: unknown) {
   const bundle = await buildPolicyBundle(input);
 
   // Do NOT modify PDFs — keep them live-identical

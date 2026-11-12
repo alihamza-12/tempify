@@ -44,7 +44,7 @@ export async function beginRegistration(input: {
         expiresAt: new Date(Date.now() + OTP_TTL_MS),
       },
     },
-    { upsert: true, new: true, runValidators: true },
+    { upsert: true, returnDocument: "after", runValidators: true },
   );
 
   try {
@@ -54,9 +54,9 @@ export async function beginRegistration(input: {
     throw error;
   }
 
-  return process.env.EMAIL_DELIVERY_MODE === "console" && process.env.NODE_ENV !== "production"
-    ? { developmentCode: code }
-    : {};
+  // The OTP is delivered through the email provider and is never returned in
+  // an API response, including local development.
+  return {};
 }
 
 export async function completeRegistration(emailInput: string, code: string) {

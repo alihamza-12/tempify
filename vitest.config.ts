@@ -9,5 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // PDF rendering and bcrypt tests are slower on some Windows machines.
+    testTimeout: 30_000,
+    hookTimeout: 120_000,
   },
 });

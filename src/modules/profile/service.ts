@@ -51,7 +51,7 @@ export async function saveCustomerProfile(userId: string, input: CustomerProfile
       $set: profileFields,
       ...(!input.lastFourDigits ? { $unset: { lastFourDigits: "" } } : {}),
     },
-    { new: true, runValidators: true },
+    { returnDocument: "after", runValidators: true },
   ).lean();
 
   if (!user) throw new ProfileError("Customer account was not found.", 404);
