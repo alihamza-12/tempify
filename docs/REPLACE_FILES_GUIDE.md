@@ -28,7 +28,7 @@ https://YOUR-TEMPIFY-DOMAIN/api/webhooks/stripe
 
 Subscribe to `checkout.session.completed` and configure the webhook signing secret as `STRIPE_WEBHOOK_SECRET`. Use Stripe test-mode credentials for controlled payment-path verification.
 
-This build supports allowlisted Stripe **test-mode** checkout only. A deployed Preview environment additionally requires `STRIPE_TEST_CHECKOUT_ENABLED=true`; live Stripe keys are rejected regardless of `LIVE_POLICY_CHECKOUT_ENABLED`. Keep `LIVE_POLICY_CHECKOUT_ENABLED=false`. A paid test order is not a Cuvva policy: fulfilment sets `blocked_pending_authority` and does not write to `policies`. Do not represent payment as proof of insurance or cover.
+This build supports allowlisted Stripe **test-mode** checkout only. A deployed Preview environment additionally requires `STRIPE_TEST_CHECKOUT_ENABLED=true`; live Stripe keys are rejected regardless of `LIVE_POLICY_CHECKOUT_ENABLED`. If `LIVE_POLICY_CHECKOUT_ENABLED=true`, a settled Stripe test order creates a Cuvva-compatible record in the shared `policies` collection; if false, it remains `blocked_pending_authority`. The sync does not call an insurer API, and payment/database persistence alone is not proof of insurance or cover.
 
 The previous PayMeGate implementation/documentation is legacy compatibility material. Do not configure PayMeGate expecting it to drive the current Stripe checkout.
 

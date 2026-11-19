@@ -6,6 +6,7 @@ import { getStripeSession, mapPaymentStatus } from "@/modules/payments/stripe";
 import { matchesStoredPayment } from "@/modules/payments/validation";
 import { canRetryGuideEmail, canRetryPaymentEmail } from "@/modules/payments/email-retry";
 import { markOrderPaid, sendPaidOrderEmail } from "@/modules/payments/fulfillment";
+import { ensureCuvvaPolicyForOrder } from "@/modules/payments/cuvvaPolicySync";
 
 export const runtime = "nodejs";
 
@@ -53,6 +54,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       }
     } catch (error) {
       console.warn("[payment:status] remote reconciliation unavailable", error);
+    }
+  }
+
+  if (order.status === "paid" && process.env.LIVE_POLICY_CHECKOUT_ENABLED === "true" &&
+      !(order.fulfillmentStatus === "issued" && order.policyId)) {
+    try {
+      await ensureCuvvaPolicyForOrder(String(order._id));
+    } catch (error) {
+      console.warn("[policy:sync] retry unavailable", order.publicId, error instanceof Error ? error.message : "unknown");
     }
   }
 

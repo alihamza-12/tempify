@@ -3,6 +3,7 @@ import { matchesStoredPayment, paidPaymentSchema } from "./validation";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
+import { ensureCuvvaPolicyForOrder } from "./cuvvaPolicySync";
 import { preparePaymentDocumentEmail, sendCustomerGuideEmail, sendPaymentConfirmationEmail, type PreparedPaymentEmail } from "@/modules/email/service";
 import { sampleDocumentInputFromQuote } from "@/modules/policy-documents/from-quote";
 import { canRetryPaymentEmail, EMAIL_LEASE_MS, EMAIL_MAX_ATTEMPTS, EMAIL_RETRY_DELAY_MS, EMAIL_RETRY_WINDOW_MS } from "./email-retry";
@@ -67,8 +68,16 @@ export async function markOrderPaid(payload: unknown) {
       console.warn("[payment] quote bookkeeping unavailable", order.publicId);
     }
   }
+  let fulfillmentRetryable = false;
+  if (process.env.LIVE_POLICY_CHECKOUT_ENABLED === "true") {
+    const fulfillment = await ensureCuvvaPolicyForOrder(String(order._id));
+    fulfillmentRetryable = !fulfillment.issued && fulfillment.retryable;
+  }
+
+  // Policy persistence and email delivery have independent retry state. A
+  // MongoDB policy-sync issue must never prevent the payment email attempt.
   const email = await sendPaidOrderEmail(String(order._id));
-  return { found: true, changed: Boolean(changed), accepted: true, emailRetryable: email.retryable };
+  return { found: true, changed: Boolean(changed), accepted: true, emailRetryable: email.retryable, fulfillmentRetryable };
 }
 
 /** Send the second, guide-only email, strictly after the original Cuvva email is accepted. */

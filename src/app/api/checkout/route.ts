@@ -88,8 +88,8 @@ export async function POST(request: Request) {
     });
     await saveCustomerProfile(String(user._id), profile);
 
-    // This build supports test-mode checkout only: no authorised policy issuer
-    // is integrated, so live cards must not be charged for unissued cover.
+    // Checkout remains test-mode only. A verified paid test event may also be
+    // mirrored to Cuvva's shared policies collection when the issuance flag is on.
     const testCheckoutAllowed = canUseStripeTestCheckout({
       secretKey: process.env.STRIPE_SECRET_KEY,
       nodeEnv: process.env.NODE_ENV,
@@ -144,6 +144,9 @@ export async function POST(request: Request) {
       publicId,
       quoteId: quote._id,
       userId: user._id,
+      vehicleId: quote.vehicleId,
+      coverStartAt: quote.cover.startAt,
+      coverEndAt: quote.cover.endAt,
       customerEmail: user.email,
       amount: quote.pricing.amount,
       currency: quote.pricing.currency,

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   remote: vi.fn(),
   markPaid: vi.fn(),
   sendPaidEmail: vi.fn(),
+  policySync: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ connectToDatabase: mocks.connect }));
@@ -19,6 +20,7 @@ vi.mock("@/modules/payments/stripe", () => ({
   getPayMeGateOrder: mocks.remote,
   mapPaymentStatus: (status: string) => status.toLowerCase(),
 }));
+vi.mock("@/modules/payments/cuvvaPolicySync", () => ({ ensureCuvvaPolicyForOrder: mocks.policySync }));
 
 import { GET } from "../../app/api/orders/[id]/route";
 
@@ -49,6 +51,7 @@ describe("order status uses persisted, validated payment state", () => {
     mocks.session.mockResolvedValue({ userId: "customer-1" });
     mocks.remote.mockResolvedValue(remote);
     mocks.markPaid.mockResolvedValue({ accepted: true });
+    mocks.policySync.mockResolvedValue({ issued: true, retryable: false, policyId: "policy-1" });
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
@@ -124,6 +127,25 @@ describe("order status uses persisted, validated payment state", () => {
     const response = await call();
     expect(mocks.sendPaidEmail).toHaveBeenCalledWith("database-order");
     expect(await response.json()).toMatchObject({ guideEmailStatus: "sent", guideEmailRetryable: false });
+  });
+
+  it("retries the payment email even when shared policy sync needs review", async () => {
+    vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "true");
+    const pending = {
+      ...initial,
+      status: "paid",
+      policyId: null,
+      fulfillmentStatus: "blocked_pending_authority",
+      confirmationEmailStatus: "pending",
+      confirmationEmailAttempts: 0,
+    };
+    reads(pending, pending);
+    mocks.policySync.mockResolvedValue({ issued: false, retryable: true });
+
+    await call();
+
+    expect(mocks.policySync).toHaveBeenCalledWith("database-order");
+    expect(mocks.sendPaidEmail).toHaveBeenCalledWith("database-order");
   });
 
   it("reports a missing guide key instead of implying the second email was sent", async () => {

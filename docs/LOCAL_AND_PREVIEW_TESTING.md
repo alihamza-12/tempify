@@ -1,6 +1,6 @@
 # Local and deployed test-mode setup
 
-This source tree supports **Stripe test-mode checkout only**. It does not issue a Cuvva policy or activate cover. Live Stripe keys are deliberately rejected by the checkout route until an authorised policy-issuance integration exists. Keep `LIVE_POLICY_CHECKOUT_ENABLED=false`; setting it to `true` does not bypass the test-only safety check.
+This source tree supports **Stripe test-mode checkout only**; live Stripe keys are rejected by the checkout route. When `LIVE_POLICY_CHECKOUT_ENABLED=true`, a verified settled test payment writes a Cuvva-compatible record to the shared `policies` collection. That database sync does not call an insurer API or itself verify legal cover. Keep the flag false unless you intentionally want paid test orders written into the configured database and visible in Cuvva.
 
 ## Never mix environment credentials
 
@@ -8,7 +8,7 @@ The environment values supplied in chat contained conflicting Stripe modes. Do n
 
 - **Local development:** use a local/staging MongoDB database, Stripe test secret, matching test publishable key, Stripe CLI test webhook secret, and test inboxes you control.
 - **Deployed test:** use a Vercel **Preview** deployment (or another isolated staging deployment) with its own test-mode environment variables. Set `STRIPE_TEST_CHECKOUT_ENABLED=true` only in that test environment. Never put test keys in Production variables.
-- **Production:** keep the production Stripe keys isolated and `LIVE_POLICY_CHECKOUT_ENABLED=false`. This build intentionally will not accept live payments because it has no authorised policy issuer. Do not enable real charges until that separate requirement is met.
+- **Production:** live Stripe keys remain rejected. Keep `LIVE_POLICY_CHECKOUT_ENABLED=false` unless you deliberately want an allowlisted Stripe test payment to create a normal Cuvva policy record in the configured shared database. This switch does not call or verify an insurer API.
 
 Do not paste secrets in chat, commit them, include them in a ZIP, or expose secret keys through `NEXT_PUBLIC_` variables. If any key pasted into chat was real rather than masked, rotate it in the provider dashboard.
 
@@ -16,7 +16,7 @@ Do not paste secrets in chat, commit them, include them in a ZIP, or expose secr
 
 1. Use a **test/staging MongoDB database**, not the live Cuvva production database. Copy `.env.example` to `.env.local` (this file is Git-ignored) and set the test database URI, shared-integration owner for that test database, a fresh session secret, and the actual test email/API values. Do not copy the values from the production environment into `.env.local`.
 2. Set `EMAIL_DELIVERY_MODE=resend`. This sends the OTP by email and prevents the development OTP from being returned to the browser or printed to the console. Resend has no general-purpose fake delivery mode: use an inbox you control. Configure both `RESEND_API_KEY` and `RESEND_GUIDE_API_KEY`; they may be different keys but must authorize their respective verified senders.
-3. Set `STRIPE_SECRET_KEY` to one Stripe **test** secret (`sk_test_…`), both configured publishable-key variables to the matching **test** publishable key (`pk_test_…`), `LIVE_POLICY_CHECKOUT_ENABLED=false`, and `STRIPE_TEST_ALLOWED_EMAILS` to the comma-separated test inbox addresses you control. For a local `npm run dev` process, test mode is permitted without a deployed override. Checkout still requires the signed-in account email to be on the allowlist.
+3. Set `STRIPE_SECRET_KEY` to one Stripe **test** secret (`sk_test_…`), both configured publishable-key variables to the matching **test** publishable key (`pk_test_…`), and `STRIPE_TEST_ALLOWED_EMAILS` to test inbox addresses you control. Set `LIVE_POLICY_CHECKOUT_ENABLED=true` only if you intentionally want the verified test payment to create a normal Cuvva policy record in the database; otherwise keep it false. For a local `npm run dev` process, test mode is permitted without a deployed override. Checkout still requires the signed-in account email to be on the allowlist.
 4. Start the app and an HTTPS tunnel to it. Stripe Checkout redirects require an HTTPS application origin in this project:
 
    ```bash
@@ -58,7 +58,7 @@ Keep Vercel **Production** values separate. Do not copy test keys or test webhoo
 ## Expected email flow and safety boundary
 
 - Signup OTP is delivered by the configured Resend email sender; console/developer OTP mode is not used.
-- A successfully verified Stripe **test-mode** payment causes one payment-confirmation email.
+- A successfully verified Stripe **test-mode** payment causes one payment-confirmation email. If `LIVE_POLICY_CHECKOUT_ENABLED=true`, it also writes a Cuvva-compatible policy record; the payment email and sample PDF attachments remain unchanged.
 - After that email is accepted, one separate guide email is attempted from `guide@client.zavoryn.tech` with eight inline JPGs, the Cuvva project URL, no PDF attachment, and no password.
 - Test-mode checkout is restricted to `STRIPE_TEST_ALLOWED_EMAILS` in all environments. The email provider still sends real messages, so list only inboxes you control.
-- No policy is issued and no insurance cover is activated. Live-mode payment is blocked in this build even if an environment file says `LIVE_POLICY_CHECKOUT_ENABLED=true`.
+- The policy sync writes database records only; it does not call an insurer API. Live-mode payment remains blocked even if an environment file says `LIVE_POLICY_CHECKOUT_ENABLED=true`.

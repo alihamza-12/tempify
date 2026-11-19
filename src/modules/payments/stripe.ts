@@ -192,11 +192,27 @@ export async function getStripeSession(sessionId: string) {
 export async function getStripePaymentIntent(paymentIntentId: string) {
   const stripe = getStripe();
   try {
-    const intent = await stripe.paymentIntents.retrieve(paymentIntentId);
-    return intent;
+    return await stripe.paymentIntents.retrieve(paymentIntentId);
   } catch (error) {
     console.error("[stripe:paymentIntent] failed", error instanceof Error ? error.message : "unknown");
     throw new PaymentProviderError("Payment intent not found.", 404);
+  }
+}
+
+/** Return only the last four digits needed by Cuvva's policy record. */
+export async function getStripeCardLast4(paymentIntentId: string) {
+  const stripe = getStripe();
+  try {
+    const intent = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ["payment_method"] });
+    if (intent.status !== "succeeded") throw new Error("PaymentIntent is not succeeded.");
+    let method = intent.payment_method;
+    if (typeof method === "string") method = await stripe.paymentMethods.retrieve(method);
+    const last4 = method && typeof method !== "string" ? method.card?.last4 : undefined;
+    if (!last4 || !/^\d{4}$/.test(last4)) throw new Error("Card details are unavailable.");
+    return last4;
+  } catch (error) {
+    console.error("[stripe:card-details] could not retrieve card last-four", error instanceof Error ? error.message : "unknown");
+    throw new PaymentProviderError("Verified card details are temporarily unavailable.", 502);
   }
 }
 

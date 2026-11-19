@@ -77,6 +77,9 @@ export async function POST(request: Request) {
       if (!result.accepted) {
         return NextResponse.json({ received: false, error: "Payment could not be matched." }, { status: 409 });
       }
+      if (result.fulfillmentRetryable) {
+        return NextResponse.json({ received: true, policySyncPending: true }, { status: 503 });
+      }
       if (result.emailRetryable) {
         return NextResponse.json({ received: true, emailPending: true }, { status: 503 });
       }

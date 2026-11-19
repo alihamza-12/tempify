@@ -2,11 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findOne: vi.fn(), findById: vi.fn(), findOneAndUpdate: vi.fn(), updateOne: vi.fn(),
-  quoteUpdate: vi.fn(), quoteFind: vi.fn(), emailSend: vi.fn(),
+  quoteUpdate: vi.fn(), quoteFind: vi.fn(), emailSend: vi.fn(), policySync: vi.fn(),
 }));
 vi.mock("@/lib/db", () => ({ connectToDatabase: vi.fn() }));
 vi.mock("@/models/Order", () => ({ Order: mocks }));
 vi.mock("@/models/Quote", () => ({ Quote: { updateOne: mocks.quoteUpdate, findById: mocks.quoteFind } }));
+vi.mock("./cuvvaPolicySync", () => ({ ensureCuvvaPolicyForOrder: mocks.policySync }));
 vi.mock("resend", () => ({ Resend: class { emails = { send: mocks.emailSend }; } }));
 
 import { markOrderPaid, sendPaidOrderEmail } from "./fulfillment";
@@ -71,6 +72,7 @@ beforeEach(() => {
   mocks.quoteUpdate.mockResolvedValue({ matchedCount: 1 });
   mocks.quoteFind.mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
   mocks.emailSend.mockResolvedValue({ data: { id: "email-1" }, error: null });
+  mocks.policySync.mockResolvedValue({ issued: true, retryable: false, policyId: "policy-1" });
 });
 afterEach(() => vi.unstubAllEnvs());
 
@@ -92,6 +94,18 @@ describe("verified payment directly sends Cuvva sample email and three PDFs", ()
     expect(payload.html).toContain("We've attached your policy documents to this email.");
     expect(payload.html).not.toContain("background:#a10a18");
     expect(mocks.quoteFind).not.toHaveBeenCalled();
+  });
+
+  it("attempts the payment email even when the Cuvva policy sync needs retry", async () => {
+    vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "true");
+    mocks.policySync.mockResolvedValue({ issued: false, retryable: true });
+
+    const result = await markOrderPaid(event);
+
+    expect(result).toMatchObject({ accepted: true, emailRetryable: false, fulfillmentRetryable: true });
+    expect(order.status).toBe("paid");
+    expect(order.confirmationEmailStatus).toBe("sent");
+    expect(mocks.emailSend).toHaveBeenCalledTimes(1);
   });
 
   it.each([{ amount: "24.99" }, { currency: "USD" }, { orderUUID: "wrong-order" }])("rejects invalid payment without sending anything: %j", async (change) => {

@@ -10,6 +10,8 @@ vi.mock("@/lib/session", () => ({ getSession: auth.session }));
 const stripeMocks = vi.hoisted(() => ({
   checkoutSessionsCreate: vi.fn(),
   checkoutSessionsRetrieve: vi.fn(),
+  paymentIntentRetrieve: vi.fn(),
+  paymentMethodRetrieve: vi.fn(),
   webhooksConstructEvent: vi.fn(),
 }));
 
@@ -26,7 +28,10 @@ vi.mock("stripe", () => {
         constructEvent: stripeMocks.webhooksConstructEvent,
       };
       paymentIntents = {
-        retrieve: vi.fn(),
+        retrieve: stripeMocks.paymentIntentRetrieve,
+      };
+      paymentMethods = {
+        retrieve: stripeMocks.paymentMethodRetrieve,
       };
     },
   };
@@ -34,6 +39,7 @@ vi.mock("stripe", () => {
 
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/models/Order";
+import { Policy } from "@/models/Policy";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
 import { POST as checkout } from "../../app/api/checkout/route";
@@ -55,6 +61,8 @@ type RemoteSession = {
 
 let mongo: MongoMemoryServer;
 let customerId: mongoose.Types.ObjectId;
+let policyOwnerId: mongoose.Types.ObjectId;
+let vehicleId: mongoose.Types.ObjectId;
 let createCalls = 0;
 let emailCalls = 0;
 let deliveries = 0;
@@ -79,7 +87,7 @@ beforeAll(async () => {
   vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://app.example.invalid");
   await connectToDatabase();
   expect(mongoose.connection.name).toBe("tempify_payment_audit");
-  await Promise.all([Order.init(), Quote.init(), User.init()]);
+  await Promise.all([Order.init(), Policy.init(), Quote.init(), User.init()]);
 
   // Mock Stripe checkout.sessions.create
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,6 +135,10 @@ beforeAll(async () => {
     if (!session) throw new Error("Session not found");
     return session;
   });
+  stripeMocks.paymentIntentRetrieve.mockResolvedValue({
+    status: "succeeded",
+    payment_method: { card: { last4: "4242" } },
+  });
 
   stripeMocks.webhooksConstructEvent.mockImplementation((rawBody: string) => {
     // Simple mock - parse rawBody as event
@@ -159,14 +171,25 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   expect(mongoose.connection.name).toBe("tempify_payment_audit");
-  await Promise.all([Order.deleteMany({}), Quote.deleteMany({}), User.deleteMany({})]);
+  await Promise.all([Order.deleteMany({}), Policy.deleteMany({}), Quote.deleteMany({}), User.deleteMany({})]);
   createCalls = emailCalls = deliveries = 0;
   providerTimesOut = providerBadUrl = providerBadAmount = false;
   emailFailures = 0;
   remoteSessions.clear();
   messages.clear();
   customerId = new mongoose.Types.ObjectId();
-  await User.collection.insertOne({ _id: customerId, email: "audit@example.invalid", fullName: "Audit Customer", role: "Customer", status: "Active" });
+  policyOwnerId = new mongoose.Types.ObjectId();
+  vehicleId = new mongoose.Types.ObjectId();
+  vi.stubEnv("SHARED_INTEGRATION_OWNER_ID", String(policyOwnerId));
+  await User.collection.insertMany([
+    { _id: customerId, email: "audit@example.invalid", fullName: "Audit Customer", firstName: "Audit", lastName: "Customer", dateOfBirth: new Date("1990-01-02"), drivingLicenceNumber: "SAMPLE12345678", role: "Customer", status: "Active" },
+    { _id: policyOwnerId, email: "owner@example.invalid", fullName: "Audit Super Admin", role: "Super Admin", status: "Active" },
+  ]);
+  await mongoose.connection.collection("vehicles").insertOne({
+    _id: vehicleId, createdBy: policyOwnerId, associatedAdmins: [policyOwnerId], removedForAdmins: [],
+    registration: "SAMPLE1", make: "Example", model: "Test Car", year: 2020,
+    vehicleIdentificationNumber: "SAMPLEVIN000000001", fuelType: "PETROL", lookupSource: "regcheck",
+  });
   auth.session.mockResolvedValue({ userId: String(customerId), email: "audit@example.invalid", role: "Customer" });
   vi.stubEnv("RESEND_GUIDE_API_KEY", "");
   vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_audit");
@@ -186,7 +209,7 @@ async function quote() {
   return Quote.create({
     publicId: randomUUID(),
     userId: customerId,
-    vehicleId: new mongoose.Types.ObjectId(),
+    vehicleId,
     driver: { title: "Mx", firstName: "Audit", lastName: "Customer", email: "audit@example.invalid", dateOfBirth: new Date("1990-01-02"), gender: "Other", occupation: "Tester", phone: "00000000000" },
     vehicle: { registration: "SAMPLE1", make: "Example", model: "Test Car", colour: "Blue", year: 2020, vehicleIdentificationNumber: "SAMPLEVIN000000001", source: "regcheck", verifiedAt: new Date() },
     cover: { startAt: new Date("2030-01-01T10:00:00Z"), endAt: new Date("2030-01-01T12:00:00Z"), durationUnit: "hours", durationValue: 2 },
@@ -252,11 +275,28 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
   it("checkout -> Stripe webhook -> three-PDF email, even after the original quote is deleted", async () => {
     const { q, local, remote } = await createOrder();
     await Quote.deleteOne({ _id: q._id });
-    expect((await webhook(stripeWebhookRequest(remote))).status).toBe(200);
+    const hookResponse = await webhook(stripeWebhookRequest(remote));
+    expect(hookResponse.status, JSON.stringify(await Order.findById(local._id).lean())).toBe(200);
     const updated = await Order.findById(local._id);
     expect(updated?.status).toBe("paid");
     expect(updated?.confirmationEmailStatus).toBe("sent");
-    expect(updated?.policyId).toBeNull();
+    expect(updated?.policyId).toBeTruthy();
+    expect(updated?.fulfillmentStatus).toBe("issued");
+    const savedPolicy = await Policy.findById(updated?.policyId).select("+tempifyOrderId").lean();
+    expect(savedPolicy).toMatchObject({
+      customerId,
+      vehicleId,
+      createdBy: policyOwnerId,
+      premiumAmount: 25,
+      cardLast4: "4242",
+      policyType: "Temporary Car",
+      coverageType: "Comprehensive",
+      underwriter: "Wakam",
+      status: "Upcoming",
+      tempifyOrderId: String(local._id),
+    });
+    expect(savedPolicy?.policyNumber).toMatch(/^PPWAKF[A-Z0-9]{11}$/);
+    expect(await Policy.countDocuments({ tempifyOrderId: String(local._id) })).toBe(1);
     expect(deliveries).toBe(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload = [...messages.values()][0].payload as any;
@@ -292,7 +332,10 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
     const { local, remote } = await createOrder();
     await Promise.all(Array.from({ length: 3 }, () => webhook(stripeWebhookRequest(remote))));
     expect(deliveries).toBe(1);
-    expect((await Order.findById(local._id))?.confirmationEmailStatus).toBe("sent");
+    const updated = await Order.findById(local._id);
+    expect(updated?.confirmationEmailStatus).toBe("sent");
+    expect(updated?.policyId).toBeTruthy();
+    expect(await Policy.countDocuments({ tempifyOrderId: String(local._id) })).toBe(1);
   });
 
   it("wrong amount cannot mark paid", async () => {
