@@ -68,14 +68,28 @@ export async function ensureCuvvaPolicyForOrder(orderId: string): Promise<SyncRe
     return fail(orderKey, "The verified vehicle is not present with required fields in the shared Cuvva vehicles collection.");
   }
 
-  let ownerId: Types.ObjectId;
-  try {
-    ownerId = parseSharedIntegrationOwnerId();
-  } catch {
-    return fail(orderKey, "SHARED_INTEGRATION_OWNER_ID is not a valid Cuvva admin ID.");
+  // Match Cuvva's admin-created policy semantics. Prefer the active Super
+  // Admin who created the already-shared vehicle, then fall back to the
+  // explicitly configured integration owner.
+  const creatorCandidates: Types.ObjectId[] = [];
+  if (vehicle.createdBy && Types.ObjectId.isValid(String(vehicle.createdBy))) {
+    creatorCandidates.push(new Types.ObjectId(String(vehicle.createdBy)));
   }
-  const owner = await User.findOne({ _id: ownerId, role: "Super Admin", status: "Active" }).select("_id").lean();
-  if (!owner) return fail(orderKey, "The configured Cuvva policy creator is not an active Super Admin.");
+  try {
+    const configuredOwnerId = parseSharedIntegrationOwnerId();
+    if (!creatorCandidates.some((candidate) => candidate.equals(configuredOwnerId))) creatorCandidates.push(configuredOwnerId);
+  } catch {
+    // A valid vehicle creator can still be used when an old env value is stale.
+  }
+  let ownerId: Types.ObjectId | null = null;
+  for (const candidate of creatorCandidates) {
+    const owner = await User.findOne({ _id: candidate, role: "Super Admin", status: "Active" }).select("_id").lean();
+    if (owner) {
+      ownerId = new Types.ObjectId(String(owner._id));
+      break;
+    }
+  }
+  if (!ownerId) return fail(orderKey, "Neither the shared vehicle creator nor SHARED_INTEGRATION_OWNER_ID is an active Cuvva Super Admin.");
 
   const startAt = new Date(coverStartAt);
   const endAt = new Date(coverEndAt);

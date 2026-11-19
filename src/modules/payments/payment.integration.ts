@@ -338,6 +338,17 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
     expect(await Policy.countDocuments({ tempifyOrderId: String(local._id) })).toBe(1);
   });
 
+  it("uses the active Super Admin who created the shared vehicle if the configured owner is stale", async () => {
+    vi.stubEnv("SHARED_INTEGRATION_OWNER_ID", String(new mongoose.Types.ObjectId()));
+    const { local, remote } = await createOrder();
+    const response = await webhook(stripeWebhookRequest(remote));
+    expect(response.status).toBe(200);
+    const order = await Order.findById(local._id);
+    const policy = await Policy.findById(order?.policyId).lean();
+    expect(policy?.createdBy).toEqual(policyOwnerId);
+    expect(order?.fulfillmentStatus).toBe("issued");
+  });
+
   it("wrong amount cannot mark paid", async () => {
     const { local, remote } = await createOrder();
     const wrongAmountSession = { ...remote, amount_total: 2400 }; // 24.00 instead of 25.00
