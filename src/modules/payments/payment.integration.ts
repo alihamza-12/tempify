@@ -169,6 +169,8 @@ beforeEach(async () => {
   await User.collection.insertOne({ _id: customerId, email: "audit@example.invalid", fullName: "Audit Customer", role: "Customer", status: "Active" });
   auth.session.mockResolvedValue({ userId: String(customerId), email: "audit@example.invalid", role: "Customer" });
   vi.stubEnv("RESEND_GUIDE_API_KEY", "");
+  vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_test_audit");
+  vi.stubEnv("STRIPE_PUBLISHABLE_KEY", "");
   vi.stubEnv("LIVE_POLICY_CHECKOUT_ENABLED", "true");
 });
 
@@ -360,6 +362,18 @@ describe("isolated MongoDB + real application routes; Stripe mocked", () => {
     const { local } = await createOrder();
     auth.session.mockResolvedValue({ userId: String(new mongoose.Types.ObjectId()), email: "other@example.invalid", role: "Customer" });
     expect((await status(new Request("https://app.example.invalid"), { params: Promise.resolve({ id: local.publicId }) })).status).toBe(404);
+  });
+
+  it("rejects mismatched Stripe keys before reserving a quote or creating an order", async () => {
+    const q = await quote();
+    vi.stubEnv("NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY", "pk_live_wrong_mode");
+
+    const response = await requestCheckout(q.publicId);
+    expect(response.status).toBe(503);
+    expect((await response.json()).error).toContain("Stripe keys are mismatched");
+    expect(createCalls).toBe(0);
+    expect(await Order.countDocuments({ quoteId: q._id })).toBe(0);
+    expect((await Quote.findById(q._id))?.status).toBe("draft");
   });
 
   it("allows allowlisted Stripe test checkout even while live policy checkout stays disabled", async () => {

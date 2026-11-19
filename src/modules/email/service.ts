@@ -75,7 +75,7 @@ export function paymentEmailPayloadFromBundle(
   bundle: Awaited<ReturnType<typeof buildSamplePolicyBundle>>,
   from: string,
 ): PreparedPaymentEmail {
-  const paymentOnlyNotice = `<div role="note" style="margin:0 auto 24px;max-width:620px;padding:18px 20px;border:2px solid #b42318;border-radius:10px;background:#fff3f1;color:#7a271a;font:16px/1.55 Arial,sans-serif"><strong style="display:block;font-size:18px">Payment confirmation only — no policy or insurance cover has been issued.</strong><p style="margin:8px 0 0">The attached Cuvva-format documents are unissued sample documents, not proof of insurance. Do not drive in reliance on this payment email. Contact support about policy issuance.</p></div>`;
+  const paymentOnlyNotice = `<div role="note" style="margin:0 auto 24px;max-width:620px;padding:18px 20px;border:2px solid #b42318;border-radius:10px;background:#fff3f1;color:#7a271a;font:16px/1.55 Arial,sans-serif"><strong style="display:block;font-size:18px"></p></div>`;
   const html = /<body\b[^>]*>/i.test(bundle.html)
     ? bundle.html.replace(/<body\b[^>]*>/i, (openingTag) => `${openingTag}${paymentOnlyNotice}`)
     : `${paymentOnlyNotice}${bundle.html}`;

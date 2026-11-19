@@ -9,7 +9,7 @@ import { Order } from "@/models/Order";
 import { Quote } from "@/models/Quote";
 import { User } from "@/models/User";
 import { canUseStripeTestCheckout, isAllowedTestCheckoutEmail } from "@/modules/payments/checkout-mode";
-import { createStripeCheckoutSession } from "@/modules/payments/stripe";
+import { createStripeCheckoutSession, validateStripeConfiguration } from "@/modules/payments/stripe";
 import { customerProfileSchema } from "@/modules/profile/schema";
 import { saveCustomerProfile } from "@/modules/profile/service";
 
@@ -119,6 +119,10 @@ export async function POST(request: Request) {
     if (!appUrl || !appUrl.startsWith("https://")) {
       return NextResponse.json({ error: "Online payment is temporarily unavailable." }, { status: 503 });
     }
+
+    // Fail fast on missing or mixed Stripe keys before the quote is claimed or
+    // a local order is created, so the customer can retry after fixing config.
+    validateStripeConfiguration();
 
     const publicId = randomUUID();
     // Validate the snapshot before locking the quote or calling the provider.

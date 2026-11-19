@@ -48,6 +48,12 @@ function configuration() {
   return { secretKey, publishableKey: publishableKeys.map((key) => key.trim()).find(Boolean) };
 }
 
+/** Validate credentials before the checkout route reserves an order/quote. */
+export function validateStripeConfiguration() {
+  getStripe();
+  configuration();
+}
+
 export async function createStripeCheckoutSession(input: {
   externalId: string;
   amount: string;

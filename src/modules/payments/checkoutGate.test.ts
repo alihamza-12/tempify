@@ -9,7 +9,11 @@ vi.mock("@/lib/session", () => ({ getSession: mocks.session }));
 vi.mock("@/models/Quote", () => ({ Quote: { findOne: mocks.quote } }));
 vi.mock("@/models/User", () => ({ User: { findById: mocks.user } }));
 vi.mock("@/models/Order", () => ({ Order: { findOne: mocks.findOrder, create: mocks.createOrder } }));
-vi.mock("@/modules/payments/stripe", () => ({ createStripeCheckoutSession: mocks.createRemote, createPayMeGateOrder: mocks.createRemote }));
+vi.mock("@/modules/payments/stripe", () => ({
+  createStripeCheckoutSession: mocks.createRemote,
+  createPayMeGateOrder: mocks.createRemote,
+  validateStripeConfiguration: vi.fn(),
+}));
 vi.mock("@/modules/profile/schema", () => ({ customerProfileSchema: { parse: (value: unknown) => value } }));
 vi.mock("@/modules/profile/service", () => ({ saveCustomerProfile: mocks.profile }));
 

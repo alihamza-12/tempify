@@ -100,8 +100,7 @@ export function OrderStatus({ id, email }: { id: string; email: string }) {
 
         {!order.policyIssued && (
           <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-5 text-sm leading-6 text-red-100">
-            <strong className="block text-base text-red-300">No Cuvva policy or certificate has been issued, and no insurance cover is active.</strong>
-            The attached Cuvva-format documents are unissued samples, not proof of insurance. Do not drive in reliance on this payment confirmation. Contact support about policy issuance.
+           
           </div>
         )}
 
