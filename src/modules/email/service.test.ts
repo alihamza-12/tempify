@@ -120,19 +120,23 @@ describe("contact email delivery", () => {
       expect.objectContaining({ idempotencyKey: `tempify-payment-documents/${samplePolicy.policy._id}/v1` }),
     );
     expect(payload.attachments.filter((attachment) => attachment.contentType === "application/pdf")).toHaveLength(3);
-    expect(payload.subject).toBe("Payment received — no policy or cover issued");
-    expect(payload.html).toContain("Payment confirmation only — no policy or insurance cover has been issued.");
-    expect(payload.html).toContain("unissued sample documents, not proof of insurance");
+    expect(payload.subject).toMatch(/^Your policy \(PPWAKF[A-Z0-9]{10}\)$/);
+    expect(payload.html).not.toContain("Payment confirmation only — no policy or insurance cover has been issued.");
+    expect(payload.html).not.toContain("unissued sample documents, not proof of insurance");
+    expect(payload.html).not.toContain("no policy or insurance cover has been issued");
+    expect(payload.html).not.toContain("Do not drive in reliance on this payment email");
     expect(payload.html).toContain("We've attached your policy documents to this email.");
 
-    // The warning is an email wrapper only. Keep every rendered attachment
-    // byte-for-byte identical to the renderer's output.
+    // Keep every rendered attachment byte-for-byte identical to the renderer's
+    // output, and send the created policy number in the subject.
     const stablePolicy = {
       ...samplePolicy,
       policy: { ...samplePolicy.policy, policyNumber: "PPWAKF1234567890" },
     };
     const unchangedBundle = await buildPolicyBundle(stablePolicy);
     const wrappedBundle = paymentEmailPayloadFromBundle(unchangedBundle, "Cuvva <auto@cuvvapolicies.com>");
+    expect(wrappedBundle.subject).toBe("Your policy (PPWAKF1234567890)");
+    expect(wrappedBundle.html).toBe(unchangedBundle.html);
     expect(wrappedBundle.attachments.map((attachment) => attachment.content)).toEqual(
       unchangedBundle.attachments.map((attachment) => attachment.content.toString("base64")),
     );
